@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game Pull Data</title>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: auto;
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        .filter-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .filter-container label {
+            margin-right: 5px;
+        }
+
+        .filter-container input,
+        .filter-container select {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            min-width: 150px;
+        }
+
+        .filter-container .dynamic-filters {
+            margin-top: 10px;
+            flex-basis: 100%;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        th,
+        td {
+            padding: 12px;
+            border: 1px solid #ddd;
+            text-align: left;
+        }
+
+        th {
+            background: #f2f2f2;
+            font-weight: bold;
+        }
+
+        .pagination {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 20px;
+        }
+
+        .player-details {
+            display: none;
+            width: 100%;
+            background: rgba(255, 255, 255, 0.9);
+            border: solid 1px #ccc;
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 10px;
+        }
+
+        .player-details table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .player-details th,
+        .player-details td {
+            border: 1px solid #ccc;
+            padding: 8px;
+        }
+
+        .btn {
+            padding: 10px 15px;
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .btn:hover {
+            background-color: #0056b3;
+        }
+
+        .filter-inputs {
+            margin-top: 10px;
+            display: flex;
+            gap: 10px;
+            flex-direction: column;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>Game Pull Data</h1>
+
+        <div class="filter-container">
+            <button id="addFilter" class="btn">Add Filter</button>
+            <div class="dynamic-filters" id="dynamicFilters"></div>
+            <label for="sortBy">Sort By:</label>
+            <select id="sortBy">
+                <option value="pullTime">Pull Time</option>
+                <option value="crashPoint">Crash Point</option>
+                <option value="totalAmount">Total Amount</option>
+            </select>
+
+            <label for="sortOrder">Sort Order:</label>
+            <select id="sortOrder">
+                <option value="ASC">Ascending</option>
+                <option value="DESC">Descending</option>
+            </select>
+        </div>
+
+        <table id="pullDataTable">
+            <thead>
+                <tr>
+                    <th>Pull ID</th>
+                    <th>Game ID</th>
+                    <th>Crash Point</th>
+                    <th>Player Count</th>
+                    <th>Total Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Data will be populated here -->
+            </tbody>
+        </table>
+
+        <div class="pagination">
+            <button id="prevPage" class="btn">Previous</button>
+            <span id="pageInfo"></span>
+            <button id="nextPage" class="btn">Next</button>
+        </div>
+    </div>
+
+    <script>
+        let currentPage = 1;
+        const rowsPerPage = 10;
+        let totalPages = 1;
+        let filters = [];
+
+        document.getElementById("addFilter").addEventListener("click", function () {
+            const filterSelect = document.createElement("select");
+            filterSelect.innerHTML = `
+                <option value="">Select Filter</option>
+                <option value="pullId">Pull ID</option>
+                <option value="crashPoint">Crash Point</option>
+                <option value="totalAmount">Total Amount</option>
+                <option value="playerCount">Player Count</option>
+                <option value="startDate">Start Date</option>
+                <option value="endDate">End Date</option>
+            `;
+            filterSelect.className = "filter-type";
+            filterSelect.addEventListener("change", function () {
+                const selectedFilter = this.value;
+                createFilterOptions(selectedFilter);
+            });
+
+            const filterContainer = document.createElement("div");
+            filterContainer.appendChild(filterSelect);
+            document.getElementById("dynamicFilters").appendChild(filterContainer);
+        });
+
+        function createFilterOptions(filterType) {
+            const filterContainer = document.createElement("div");
+            filterContainer.className = "filter-inputs";
+
+            const methodSelect = document.createElement("select");
+            methodSelect.innerHTML = `
+                <option value="">Select Method</option>
+                <option value="operator">Based on Operator</option>
+                <option value="minMax">Based on Min/Max</option>
+            `;
+
+            const operatorContainer = document.createElement("div");
+            const operatorSelect = document.createElement("select");
+            operatorSelect.innerHTML = `
+                <option value="">Select Operator</option>
+                <option value="=">=</option>
+                <option value="<">&lt;</option>
+                <option value=">">&gt;</option>
+            `;
+
+            const valueInput = document.createElement("input");
+            valueInput.type = "text";
+            valueInput.placeholder = `Value for ${filterType}`;
+
+            const minInput = document.createElement("input");
+            minInput.type = "number";
+            minInput.placeholder = `Min ${filterType}`;
+
+            const maxInput = document.createElement("input");
+            maxInput.type = "number";
+            maxInput.placeholder = `Max ${filterType}`;
+
+            methodSelect.addEventListener("change", function () {
+                const method = this.value;
+                operatorContainer.innerHTML = ""; // Clear previous inputs
+                if (method === "operator") {
+                    operatorContainer.appendChild(operatorSelect);
+                    operatorContainer.appendChild(valueInput);
+                } else if (method === "minMax") {
+                    operatorContainer.appendChild(minInput);
+                    operatorContainer.appendChild(maxInput);
+                }
+            });
+
+            filterContainer.appendChild(methodSelect);
+            filterContainer.appendChild(operatorContainer);
+            document.getElementById("dynamicFilters").appendChild(filterContainer);
+
+            // Store filter settings
+            filters.push({
+                filterType,
+                method: methodSelect,
+                operator: operatorSelect,
+                value: valueInput,
+                min: minInput,
+                max: maxInput
+            });
+        }
+
+        function fetchPullData() {
+            const queryParams = {
+                page: currentPage,
+                limit: rowsPerPage,
+                sortBy: document.getElementById("sortBy").value,
+                sortOrder: document.getElementById("sortOrder").value,
+            };
+
+            filters.forEach(filter => {
+                const { filterType, method, operator, value, min, max } = filter;
+
+                if (filterType) {
+                    queryParams[filterType] = null; // Placeholder to ensure the filter is captured
+                    if (method.value === "operator") {
+                        queryParams[`${filterType}Operator`] = operator.value;
+                        queryParams[filterType] = value.value;
+                    } else if (method.value === "minMax") {
+                        queryParams[`${filterType}Min`] = min.value;
+                        queryParams[`${filterType}Max`] = max.value;
+                    }
+                }
+            });
+
+            const queryString = new URLSearchParams(queryParams).toString();
+
+            fetch(`http://localhost:3000/v1/game/history/1?${queryString}`)
+                .then(response => response.json())
+                .then(data => {
+                    totalPages = Math.ceil(data.total / rowsPerPage); // Assuming API returns a total count
+                    displayPullData(data.pulls); // Assuming `data.pulls` contains the array of pull data
+                    updatePagination();
+                });
+        }
+
+        function displayPullData(pulls) {
+            const tableBody = document.querySelector("#pullDataTable tbody");
+            tableBody.innerHTML = "";
+
+            pulls.forEach(pull => {
+                const row = document.createElement("tr");
+                row.innerHTML = `
+                    <td>${pull.pullId}</td>
+                    <td>${pull.gameId}</td>
+                    <td>${pull.crashPoint}</td>
+                    <td>${pull.playerCount}</td>
+                    <td>${pull.totalPullAmount}</td>
+                `;
+                row.addEventListener("click", () => showPlayerDetails(pull.players, row));
+                tableBody.appendChild(row);
+            });
+        }
+
+        function showPlayerDetails(players, row) {
+            const playerDetailsDiv = $(row).next('.player-details');
+
+            if (playerDetailsDiv.length) {
+                playerDetailsDiv.slideToggle("slow", function () {
+                    playerDetailsDiv.remove();
+                });
+            } else {
+                const newPlayerDetailsDiv = $('<div class="player-details"></div>');
+                const playerDetailsTable = $('<table></table>').append(`
+                    <thead>
+                        <tr>
+                            <th>Player Name</th>
+                            <th>Amount</th>
+                            <th>Timestamp</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    </tbody>
+                `);
+
+                players.forEach(player => {
+                    const playerRow = $('<tr></tr>').append(`
+                        <td>${player.name}</td>
+                        <td>${player.amount}</td>
+                        <td>${player.timestamp}</td>
+                    `);
+                    playerDetailsTable.find('tbody').append(playerRow);
+                });
+
+                newPlayerDetailsDiv.append(playerDetailsTable);
+                $(row).after(newPlayerDetailsDiv);
+                newPlayerDetailsDiv.slideDown("slow");
+            }
+        }
+
+        function updatePagination() {
+            document.getElementById("pageInfo").innerText = `Page ${currentPage} of ${totalPages}`;
+            document.getElementById("prevPage").disabled = currentPage === 1;
+            document.getElementById("nextPage").disabled = currentPage === totalPages;
+        }
+
+        document.getElementById("prevPage").addEventListener("click", function () {
+            if (currentPage > 1) {
+                currentPage--;
+                fetchPullData();
+            }
+        });
+
+        document.getElementById("nextPage").addEventListener("click", function () {
+            if (currentPage < totalPages) {
+                currentPage++;
+                fetchPullData();
+            }
+        });
+
+        // Initial data fetch
+        fetchPullData();
+    </script>
+</body>
+
+</html>

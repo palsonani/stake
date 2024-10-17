@@ -1,0 +1,474 @@
+<!-- <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plinko Game</title>
+    <style>
+        /* Basic CSS to style the Plinko game layout */
+        #plinkoGame {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 50px;
+        }
+
+        #betSection {
+            margin-bottom: 20px;
+        }
+
+        #resultDisplay, #payoutDisplay {
+            margin-top: 20px;
+            font-size: 20px;
+        }
+
+        select, input, button {
+            padding: 10px;
+            margin: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div id="plinkoGame">
+        <h1>Plinko Game</h1>
+        <div id="betSection">
+            <label for="betAmount">Bet Amount: </label>
+            <input type="number" id="betAmount" placeholder="Enter Bet Amount" min="0.01" step="0.01">
+
+            <label for="rows">Rows: </label>
+            <select id="rows">
+                <option value="8">8 Rows</option>
+                <option value="9">9 Rows</option>
+                <option value="10">10 Rows</option>
+            </select>
+
+            <label for="risk">Risk Level: </label>
+            <select id="risk">
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+            </select>
+
+            <button id="betButton">Place Bet</button>
+        </div>
+
+        <div id="resultDisplay"></div>
+        <div id="payoutDisplay"></div>
+    </div>
+
+    <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+  <script>
+    const socket = io('http://localhost:3003', { path: '/ws' });
+
+        const betButton = document.getElementById('betButton');
+        const betAmountInput = document.getElementById('betAmount');
+        const rowsSelect = document.getElementById('rows');
+        const riskLevelSelect = document.getElementById('risk');
+        const resultDisplay = document.getElementById('resultDisplay');
+        const payoutDisplay = document.getElementById('payoutDisplay');
+
+        betButton.addEventListener('click', () => {
+            const betAmount = parseFloat(betAmountInput.value);
+            const rows = parseInt(rowsSelect.value);
+            const riskLevel = riskLevelSelect.value;
+
+            if (isNaN(betAmount) || betAmount <= 0) {
+                alert('Please enter a valid bet amount');
+                return;
+            }
+
+            // Emit the bet with risk level to the server
+            socket.emit('plinkoPlaceBet', {
+                userId: 2,  // Replace with actual user ID
+                betAmount,
+                rows,
+                riskLevel
+            });
+        });
+
+        // Handle the result from the server
+        socket.on('plinkoBetResult', (data) => {
+            const { multiplier, dropPosition, winAmount } = data;
+
+            resultDisplay.textContent = `Ball landed at position ${dropPosition}. Multiplier: ${multiplier}x`;
+            payoutDisplay.textContent = `Payout: $${winAmount.toFixed(2)}`;
+        });
+
+        // Handle errors
+        socket.on('error', (error) => {
+            alert(error.message);
+        });
+    </script>
+</body>
+</html> -->
+<!-- <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plinko Game</title>
+    <style>
+        #plinko-board {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+            margin-top: 20px;
+        }
+
+        .plinko-row {
+            display: flex;
+            justify-content: center;
+            margin: 10px 20px;
+        }
+
+        .plinko-dot {
+            width: 15px;
+            height: 15px;
+            background-color: blue;
+            border-radius: 50%;
+            margin: 20px 20px;
+        }
+
+        .multiplier-row {
+            display: flex;
+            justify-content: center;
+            margin-top: 20px;
+        }
+
+        .multiplier-slot {
+            background-color: rgb(226, 17, 17);
+            text-align: center;
+            line-height: 40px;
+            border: 1px solid #000;
+            font-weight: bold;
+            margin: -21px 7px;
+        }
+
+        .plinko-ball {
+            width: 15px;
+            height: 15px;
+            background-color: red;
+            border-radius: 50%;
+            position: absolute;
+            transition: transform 0.5s ease-in;
+        }
+
+        .control-panel {
+            margin-bottom: 20px;
+        }
+
+        .control-panel label {
+            margin-right: 10px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="control-panel">
+        <label for="row-select">Select Rows:</label>
+        <select id="row-select">
+            <option value="8">8 Rows</option>
+            <option value="9">9 Rows</option>
+            <option value="10">10 Rows</option>
+            <option value="11">11 Rows</option>
+            <option value="12">12 Rows</option>
+            <option value="13">13 Rows</option>
+            <option value="14">14 Rows</option>
+            <option value="15">15 Rows</option>
+            <option value="16">16 Rows</option>
+        </select>
+
+        <label for="risk-select">Select Risk Level:</label>
+        <select id="risk-select">
+            <option value="low">Low</option>
+            <option value="medium">Medium</option>
+            <option value="high">High</option>
+        </select>
+
+        <button onclick="startGame()">Start Game</button>
+    </div>
+
+    <div id="plinko-board"></div>
+
+    <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+    <script>
+        const socket = io('http://localhost:3003', { path: '/ws' });
+
+        const rowConfigs = {
+            8: {
+                low: [5.6, 2.1, 1.1, 1, 0.5, 1, 1.1, 2.1, 5.6],
+                medium: [13, 3, 1.3, 0.7, 0.4, 0.7, 1.3, 3, 13],
+                high: [29, 4, 1.5, 0.3, 0.2, 0.3, 1.5, 4, 29]
+            },
+            9: {
+                low: [5.6, 2, 1.6, 1, 0.7, 0.7, 1, 1.6, 2, 5.6],
+                medium: [18, 4, 1.7, 0.9, 0.5, 0.5, 0.9, 1.7, 4, 18],
+                high: [43, 7, 2, 0.6, 0.2, 0.2, 0.6, 2, 7, 43]
+            },
+            10: {
+                low: [8.9, 3, 1.4, 1.1, 1, 0.5, 1, 1.1, 1.4, 3, 8.9],
+                medium: [22, 5, 2, 1.4, 0.6, 0.4, 0.6, 1.4, 2, 5, 22],
+                high: [76, 10, 3, 0.9, 0.3, 0.2, 0.3, 0.9, 3, 10, 76]
+            },
+            11: {
+                low: [8.4, 3, 1.9, 1.3, 1, 0.7, 0.7, 1, 1.3, 1.9, 3, 8.4],
+                medium: [24, 6, 3, 1.8, 0.7, 0.5, 0.5, 0.7, 1.8, 3, 6, 24],
+                high: [120, 14, 5.2, 1.4, 0.4, 0.2, 0.2, 0.4, 1.4, 5.2, 14, 120]
+            },
+            12: {
+                low: [10, 3, 1.6, 1.4, 1.1, 1, 0.5, 1, 1.1, 1.4, 1.6, 3, 10],
+                medium: [33, 11, 4, 2, 1.1, 0.6, 0.3, 0.6, 1.1, 2, 4, 11, 33],
+                high: [170, 24, 8.1, 2, 0.7, 0.2, 0.2, 0.2, 0.7, 2, 8.1, 24, 170]
+            },
+            13: {
+                low: [8.1, 4, 3, 1.9, 1.2, 0.9, 0.7, 0.7, 0.9, 1.2, 1.9, 3, 4, 8.1],
+                medium: [43, 13, 6, 3, 1.3, 0.7, 0.4, 0.4, 0.7, 1.3, 3, 6, 13, 43],
+                high: [260, 37, 11, 4, 1, 0.2, 0.2, 0.2, 0.2, 1, 4, 11, 37, 260]
+            },
+            14: {
+                low: [7.1, 4, 1.9, 1.4, 1.3, 1.1, 1, 0.5, 1, 1.1, 1.3, 1.4, 1.9, 4, 7.1],
+                medium: [58, 15, 7, 4, 1.9, 1, 0.5, 0.2, 0.5, 1, 1.9, 4, 7, 15, 58],
+                high: [420, 56, 18, 5, 1.9, 0.3, 0.2, 0.2, 0.2, 0.3, 1.9, 5, 18, 56, 420]
+            },
+            15: {
+                low: [15, 8, 3, 2, 1.5, 1.1, 1, 0.7, 0.7, 1, 1.1, 1.5, 2, 3, 8, 15],
+                medium: [88, 18, 11, 5, 3, 1.3, 0.5, 0.3, 0.3, 0.5, 1.3, 3, 5, 11, 18, 88],
+                high: [620, 83, 27, 8, 3, 0.5, 0.2, 0.2, 0.2, 0.2, 0.5, 3, 8, 27, 83, 620]
+            },
+            16: {
+                low: [16, 9, 2, 1.4, 1.4, 1.2, 1.1, 1, 0.5, 1, 1.1, 1.2, 1.4, 1.4, 2, 9, 16],
+                medium: [110, 41, 10, 5, 3, 1.5, 1, 0.5, 0.3, 0.5, 1, 1.5, 3, 5, 10, 41, 110],
+                high: [1000, 130, 26, 9, 4, 2, 0.2, 0.2, 0.2, 0.2, 0.2, 2, 4, 9, 26, 130, 1000]
+            }
+        };
+
+        function getSelectedOptions() {
+            const rowSelect = document.getElementById('row-select');
+            const riskSelect = document.getElementById('risk-select');
+            return {
+                rows: parseInt(rowSelect.value),
+                riskLevel: riskSelect.value
+            };
+        }
+
+        function generatePlinkoBoard(rows, riskLevel) {
+            const board = document.getElementById('plinko-board');
+            board.innerHTML = ''; // Clear the board
+            const multipliers = rowConfigs[rows][riskLevel];
+
+            const totalRows = rows  + 2 ;
+
+            for (let row = 2; row < totalRows; row++) {
+                const rowDiv = document.createElement('div');
+                rowDiv.classList.add('plinko-row');
+                for (let col = 0; col <= row; col++) {
+                    const dot = document.createElement('div');
+                    dot.classList.add('plinko-dot');
+                    rowDiv.appendChild(dot);
+                }
+                board.appendChild(rowDiv);
+            }
+
+            // Create multiplier row based on the total number of rows
+            const multiplierRow = document.createElement('div');
+            multiplierRow.classList.add('multiplier-row');
+
+            const multiplierCount = totalRows-1;
+            const multiplierWidth = 40; // Adjust width to fit layout
+            const multiplierHeight = 40; // Adjust height to fit layout
+
+            for (let i = 0; i < multiplierCount; i++) {
+                const slot = document.createElement('div');
+                slot.classList.add('multiplier-slot');
+                slot.innerText = multipliers[i] || ''; // Fill in with appropriate multiplier
+                slot.style.width = `${multiplierWidth}px`; // Set width
+                slot.style.height = `${multiplierHeight}px`; // Set height
+                multiplierRow.appendChild(slot);
+            }
+
+            board.appendChild(multiplierRow);
+        }
+
+
+        function startGame() {
+            const { rows, riskLevel } = getSelectedOptions();
+            generatePlinkoBoard(rows, riskLevel);
+            dropBall(rows);
+        }
+
+        function dropBall(rows) {
+            const board = document.getElementById('plinko-board');
+            const ball = document.createElement('div');
+            ball.classList.add('plinko-ball');
+            board.appendChild(ball);
+
+            let currentRow = 0;
+            let currentPosition = Math.floor(rows / 2);
+            const rowHeight = 50; // Distance between rows
+            const columnWidth = 20; // Width between columns
+
+            function moveBall() {
+                if (currentRow < rows) {
+                    currentRow++;
+                    currentPosition += Math.random() < 0.5 ? -1 : 1;
+                    const multiplier = Math.max(0, Math.min(currentPosition, rowConfigs[rows][riskLevel].length - 1));
+                    ball.style.transform = `translate(${currentPosition * columnWidth}px, ${currentRow * rowHeight}px)`;
+                    requestAnimationFrame(moveBall);
+                } else {
+                    landBallInSlot(currentPosition);
+                }
+            }
+            moveBall();
+        }
+
+        function landBallInSlot(position) {
+            const multiplierRow = document.querySelector('.multiplier-row');
+            const slots = multiplierRow.querySelectorAll('.multiplier-slot');
+            const slotIndex = Math.max(0, Math.min(position, slots.length - 1));
+            const finalMultiplier = slots[slotIndex].innerText;
+
+            socket.emit('ballLanded', { position, finalMultiplier });
+        }
+
+        socket.on('gameResult', (data) => {
+            alert(`You won ${data.multiplier}x your bet!`);
+        });
+    </script>
+</body>
+
+</html> -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Betting Form with Socket.io</title>
+    <style>
+        /* CSS styles */
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin: 10px 0 5px;
+        }
+        input, select {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            background-color: #28a745;
+            color: #fff;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #218838;
+        }
+        .result, .error {
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .result {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Place Your Bet</h1>
+        <form id="betForm">
+            <label for="betAmount">Bet Amount:</label>
+            <input type="number" id="betAmount" name="betAmount" required>
+
+            <label for="rows">Rows:</label>
+            <input type="number" id="rows" name="rows" required>
+
+            <label for="riskLevel">Risk Level:</label>
+            <select id="riskLevel" name="riskLevel" required>
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+            </select>
+
+            <label for="autoBetCount">Auto Bet Count:</label>
+            <input type="number" id="autoBetCount" name="autoBetCount" required>
+
+            <button type="submit">Place Bet</button>
+        </form>
+
+        <div id="result" class="result" style="display: none;"></div>
+        <div id="error" class="error" style="display: none;"></div>
+    </div>
+
+    <!-- Include Socket.io client -->
+    <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+    <script>
+        const socket = io('http://localhost:3004', { path: '/ws' });
+
+        document.getElementById('betForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            const betAmount = document.getElementById('betAmount').value;
+            const rows = document.getElementById('rows').value; 
+            const riskLevel = document.getElementById('riskLevel').value;
+            const autoBetCount = document.getElementById('autoBetCount').value;
+
+            // Emit the placeBet event with data
+            socket.emit('plinkoPlaceBet', {
+                userId:2,
+                betAmount,
+                rows,
+                riskLevel,
+                autoBetCount
+            });
+        });
+
+        // Listen for betResult event from server
+        socket.on('plinkoBetResult', function(result) {
+            document.getElementById('result').style.display = 'block';
+            document.getElementById('result').innerHTML = `
+                <h2>Bet Result</h2>
+                <p>Multiplier: ${result.finalMultiplier}</p>
+                <p>Drop Position: ${result.dropPosition}</p>
+                <p>Win Amount: ${result.winAmount}</p>
+            `;
+            document.getElementById('error').style.display = 'none';
+        });
+
+        // Handle errors
+        socket.on('error', function(error) {
+            document.getElementById('error').style.display = 'block';
+            document.getElementById('error').innerText = error.message;
+            document.getElementById('result').style.display = 'none';
+        });
+    </script>
+</body>
+</html>
+

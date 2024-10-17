@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smooth Line Chart with Background</title>
+    <script src="https://canvasjs.com/assets/script/canvasjs.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #1e2a38;
+        }
+
+        .chart-container {
+            width: 80%;
+            max-width: 800px;
+        }
+    </style>
+</head>
+<body>
+    <div class="chart-container">
+        <div id="chartContainer" style="height: 370px; width: 100%;"></div>
+    </div>
+
+    <script>
+        window.onload = function () {
+            // Find the maximum data point
+            const dataPoints = [
+                { x: 1, y: 1 },
+                { x: 2, y: 2 },
+                { x: 3, y: 3 },
+                { x: 4, y: 4 },
+                { x: 5, y: 5 },
+                { x: 6, y: 6 },
+                { x: 7, y: 7 },
+                { x: 8, y: 8 },
+                { x: 9, y: 9 },
+                { x: 10, y: 10 }
+            ];
+
+            // Find the highest y value
+            const maxYPoint = dataPoints.reduce((prev, curr) => (curr.y > prev.y ? curr : prev));
+
+            var chart = new CanvasJS.Chart("chartContainer", {
+                theme: "light2",
+                animationEnabled: true,
+                exportEnabled: true,
+                backgroundColor: "#1e2a38", // Match the body background color
+                title: {
+                    text: "Smooth Line Chart",
+                    fontColor: "#fff"
+                },
+                axisY: {
+                    title: "Values",
+                    minimum: 0,  // Ensuring the y-axis starts from 0
+                    maximum: 11, // Setting the maximum to just above 10 for spacing
+                    interval: 1,  // Setting interval to 1 for better visibility of steps
+                    gridThickness: 0,  // Remove Y-axis grid lines
+                    labelFontColor: "#fff",
+                    titleFontColor: "#fff",
+                },
+                axisX: {
+                    title: "X Values",
+                    interval: 1,
+                    gridThickness: 0,  // Remove X-axis grid lines
+                    labelFontColor: "#fff",
+                    titleFontColor: "#fff",
+                },
+                data: [{
+                    type: "area",  // Line chart with area fill
+                    fillOpacity: 0.5,  // Make the background fill 50% opaque
+                    color: "orange",  // Orange background below line
+                    dataPoints: dataPoints,
+                    lineColor: "white",  // White line color
+                    lineThickness: 4,  // Bold line
+                    markerType: "circle", // Marker at the highest point only
+                    markerSize: 10,  // Bold dot size at the highest point
+                    markerColor: "white",  // White color for the marker
+                    markerBorderColor: "white", // Marker border color
+                    markerBorderThickness: 2,  // Border thickness for the marker
+                    // Apply marker only to the highest point
+                    markerIndex: [dataPoints.indexOf(maxYPoint)],  // Show marker at the highest point only
+                }]
+            });
+
+            chart.render();
+        }
+    </script>
+</body>
+</html>

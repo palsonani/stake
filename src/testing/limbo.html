@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Limbo Game</title>
+    <script src="https://cdn.socket.io/4.5.1/socket.io.min.js"></script>
+</head>
+<body>
+    <h1>Limbo Game Testing</h1>
+    
+    <div>
+        <h2>Manual Bet</h2>
+        <label for="manualBetAmount">Bet Amount:</label>
+        <input type="number" id="manualBetAmount" value="100">
+        <label for="manualMultiplier">Cashout Multiplier:</label>
+        <input type="number" step="0.01" id="manualMultiplier" value="2.00">
+        <button id="manualBetBtn">Place Manual Bet</button>
+    </div>
+
+    <div>
+        <h2>Auto Bet</h2>
+        <label for="autoBetAmount">Initial Bet Amount:</label>
+        <input type="number" id="autoBetAmount" value="100">
+        <label for="autoMultiplier">Cashout Multiplier:</label>
+        <input type="number" step="0.01" id="autoMultiplier" value="2.00">
+        <label for="autoBetCount">Auto Bet Count:</label>
+        <input type="number" id="autoBetCount" value="5">
+        <label for="onWinPercentage">On Win (%):</label>
+        <input type="number" id="onWinPercentage" >
+        <label for="onLossPercentage">On Loss (%):</label>
+        <input type="number" id="onLossPercentage"  >
+        <label for="stopOnProfit">Stop on Profit:</label>
+        <input type="number" id="stopOnProfit" >
+        <label for="stopOnLoss">Stop on Loss:</label>
+        <input type="number" id="stopOnLoss" >
+        <button id="autoBetBtn">Start Auto Bet</button>
+    </div>
+
+    <h3>Bet Results</h3>
+    <div id="results"></div>
+
+    <script>
+        const socket = io('http://192.168.29.203:3007', { path: '/ws' });
+
+        // Elements
+        const manualBetBtn = document.getElementById('manualBetBtn');
+        const autoBetBtn = document.getElementById('autoBetBtn');
+        const resultsDiv = document.getElementById('results');
+
+        // Handle manual bet
+        manualBetBtn.addEventListener('click', () => {
+            const betAmount = parseFloat(document.getElementById('manualBetAmount').value);
+            const selectedMultiplier = parseFloat(document.getElementById('manualMultiplier').value);
+
+            socket.emit('limboPlaceBet', {
+                userId: 2,  // Hardcoded for testing, replace with actual user ID
+                betAmount,
+                multiplier: selectedMultiplier,
+                betType: 'manual'
+            });
+
+            console.log(`Manual bet placed. Bet Amount: ${betAmount}, Cashout Multiplier: ${selectedMultiplier}`);
+        });
+
+        // Handle auto bet
+        autoBetBtn.addEventListener('click', () => {
+            const betAmount = parseFloat(document.getElementById('autoBetAmount').value);
+            const selectedMultiplier = parseFloat(document.getElementById('autoMultiplier').value);
+            const autoBetCount = parseInt(document.getElementById('autoBetCount').value);
+            const onWinPercentage = parseFloat(document.getElementById('onWinPercentage').value);
+            const onLossPercentage = parseFloat(document.getElementById('onLossPercentage').value);
+            const stopOnProfit = parseFloat(document.getElementById('stopOnProfit').value);
+            const stopOnLoss = parseFloat(document.getElementById('stopOnLoss').value);
+
+            socket.emit('limboPlaceBet', {
+                userId: 2,  // Hardcoded for testing, replace with actual user ID
+                betAmount,
+                multiplier: selectedMultiplier,
+                autoBetCount,
+                onWin: onWinPercentage,
+                onLoss: onLossPercentage,
+                stopOnProfit,
+                stopOnLoss,
+                betType: 'auto'
+            });
+
+            console.log(`Auto bet started. Initial Bet: ${betAmount}, Multiplier: ${selectedMultiplier}, Auto Bet Count: ${autoBetCount},${stopOnProfit},${stopOnLoss}`);
+        });
+
+        // Listen for bet results from backend
+        socket.on('betResult', (data) => {
+            const { isWin, actualMultiplier, selectedMultiplier, winAmount } = data;
+
+            const resultMessage = `
+                <p>
+                    <strong>${isWin ? 'Win' : 'Loss'}</strong> - 
+                    Selected Multiplier: ${selectedMultiplier}, 
+                    Actual Multiplier: ${actualMultiplier}, 
+                    Win Amount: ${winAmount}
+                </p>`;
+            
+            resultsDiv.innerHTML += resultMessage;
+        });
+    </script>
+</body>
+</html>

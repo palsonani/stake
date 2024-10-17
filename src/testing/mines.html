@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mines Game</title>
+    <style>
+        /* Basic styles for the game board */
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background-color: #1a1d29;
+            /* Match the dark background */
+            color: white;
+        }
+
+        #gameBoard {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 5px;
+            margin: 20px auto;
+            width: fit-content;
+        }
+
+        .tile {
+            width: 80px;
+            height: 80px;
+            background-color: #2c313c;
+            /* Darker gray background */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            font-size: 36px;
+            border-radius: 8px;
+            /* Rounded corners for the tiles */
+            border: 2px solid #3e4452;  
+            /* Dark border for each tile */
+            transition: background-color 0.3s;
+        }
+
+        .tile:hover {
+            background-color: #3e4452;
+            /* Slightly lighter on hover */
+        }
+
+        .selected {
+            background-color: #20acd6;
+            /* Teal background for selected tiles */
+        }
+
+        .mine {
+            background-color: #e76f51;
+            /* Red for mines */
+            color: white;
+        }
+
+        .dimmed {
+            background-color: #cccccc;
+            color: rgba(255, 255, 255, 0.3);
+            /* Make the diamond appear lighter */
+            filter: blur(2px);
+            /* Slight blur to the dimmed diamonds */
+            pointer-events: none;
+            /* Disable clicking on dimmed tiles */
+        }
+
+        .mine-blur {
+            background-color: #e76f51;
+            filter: blur(3px);
+            /* Add blur to revealed mines */
+            pointer-events: none;
+        }
+
+        #message {
+            margin: 20px;
+            font-size: 20px;
+            color: #e9c46a;
+            /* Gold color for message text */
+        }
+
+        #startGameBtn {
+            background-color: #2a9d8f;
+            color: white;
+            padding: 10px 20px;
+            font-size: 18px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        #startGameBtn:hover {
+            background-color: #21867a;
+            /* Darker teal on hover */
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Mines Game</h1>
+    <div id="gameBoard"></div>
+    <button id="startGameBtn">Start Game</button>
+    <div id="message"></div>
+
+    <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+    <script>
+        const socket = io('http://192.168.29.203:3005', { path: '/ws' });
+        const gameBoard = document.getElementById('gameBoard');
+        const startGameBtn = document.getElementById('startGameBtn');
+        const messageDiv = document.getElementById('message');
+        let betId;
+        const userId = '2'; // Replace with the actual user ID
+        const gameId = '13'; // Replace with the actual game ID
+        let totalMines = 5; // Number of mines (can be set dynamically)
+        let gameOver = false; // Flag to track game over state
+
+        function createGameBoard(mineLocations = []) {
+            gameOver = false; // Reset the game over flag
+            gameBoard.innerHTML = ''; // Clear the board
+            for (let i = 0; i < 25; i++) {
+                const tile = document.createElement('div');
+                tile.classList.add('tile');
+                tile.dataset.index = i; // Store tile index
+                tile.addEventListener('click', () => selectTile(i));
+
+                // Check if the tile should be marked as selected or a mine
+                if (mineLocations[i]) {
+                    if (mineLocations[i].isMine) {
+                        tile.innerHTML = '💀'; // Show skull emoji for mines
+                        tile.classList.add('mine'); // Mark as mine
+                    } else if (mineLocations[i].selected) {
+                        tile.innerHTML = '💎'; // Show diamond emoji for selected tiles
+                        tile.classList.add('selected'); // Mark tile as selected
+                    }
+                }
+
+                gameBoard.appendChild(tile);
+            }
+        }
+
+        function selectTile(index) {
+            if (gameOver) return; // Prevent tile selection if game over
+
+            const tile = gameBoard.children[index];
+            if (tile.classList.contains('selected')) {
+                messageDiv.innerText = 'Tile already selected!';
+                return;
+            }
+
+            // Emit selectTile event to the server
+            socket.emit('selectTile', { gameId, userId, tileIndex: index });
+
+            tile.classList.add('selected'); // Mark tile as selected
+        }
+
+        startGameBtn.addEventListener('click', () => {
+            // Emit startGame event to the server
+            socket.emit('minePlaceBet', { userId, gameId, totalMines });
+            createGameBoard(); // Create the game board
+            messageDiv.innerText = 'Game started! Select your tiles.';
+        });
+
+        window.addEventListener('load', () => {
+            // Emit startGame event to the server
+            createGameBoard(); // Create the game board
+            messageDiv.innerText = 'Game started! Select your tiles.';
+        });
+
+        // Listen for gameStarted event from the server
+        socket.on('gameStarted', (data) => {
+            betId = data.betId; // Save bet ID
+            messageDiv.innerText = 'Game started! Select your tiles.';
+        });
+
+        // Listen for tileSelected event from the server
+        socket.on('tileSelected', (data) => {
+            const tileIndex = data.tileIndex;
+            const tile = gameBoard.children[tileIndex];
+
+            // Ensure tile exists before trying to modify it
+            if (tile) {
+                tile.innerHTML = '💎';
+                messageDiv.innerText = `Tile selected! Multiplier: ${data.multiplier}`;
+                tile.classList.add('selected'); // Mark tile as selected
+            } else {
+                console.error('Tile not found for index:', tileIndex);
+                messageDiv.innerText = 'Error: Tile not found!';
+            }
+        });
+
+        // Listen for gameOver event from the server
+        // socket.on('gameOver', (data) => {
+        //     messageDiv.innerText = `Game over! Multiplier: ${data.multiplier}. Remaining mines: ${data.remainingMines.join(', ')}`;
+        //     revealRemainingMines(data.remainingMines);
+        // });
+
+        // Function to reveal remaining mines and unselected tiles with dimmed and blurred effects
+        // Function to reveal remaining mines and unselected tiles with dimmed and blurred effects
+        function revealRemainingMines(remainingMines, clickedMineIndex) {
+            gameOver = true; // Set the game over flag to true
+
+            // Show all remaining unselected tiles with a lighter, blurred diamond
+            for (let i = 0; i < gameBoard.children.length; i++) {
+                const tile = gameBoard.children[i];
+                if (!tile.classList.contains('selected') && !remainingMines.includes(i)) {
+                    tile.innerHTML = '💎'; // Light diamond for unselected tiles
+                    tile.classList.add('dimmed'); // Apply the blur effect for unselected tiles
+                }
+            }
+
+            // Reveal the mines, but don't blur the first mine clicked by the user
+            remainingMines.forEach(index => {
+                const tile = gameBoard.children[index];
+                if (index === clickedMineIndex) {
+                    tile.innerHTML = '💀'; // Show the skull without blur for the first clicked mine
+                    tile.classList.add('mine'); // Normal mine styling without blur
+                } else {
+                    tile.innerHTML = '💀'; // Show skull for remaining mines
+                    tile.classList.add('mine-blur'); // Apply the blur effect for remaining mines
+                }
+            });
+        }
+
+        // Listen for gameOver event from the server
+        socket.on('gameOver', (data) => {
+            messageDiv.innerText = `Game over! Multiplier: ${data.multiplier}. Remaining mines: ${data.remainingMines.join(', ')}.cliked mine:${data.clickedMine}`;
+            revealRemainingMines(data.remainingMines, data.clickedMine); // Pass the index of the clicked mine
+        });
+
+
+        // Listen for restoreGame event from the server
+        socket.on('gameRestored', (gameState) => {
+            createGameBoard(gameState.mineLocations); // Restore the game board
+            messageDiv.innerText = 'Game restored! Select your tiles.';
+        });
+
+        socket.on('gameRestored', (gameState) => {
+            createGameBoard(gameState.mineLocations); // Restore the game board
+            messageDiv.innerText = 'Game restored! Select your tiles.';
+        });
+
+        // Function to restore the game state
+        function restoreGame() {
+            socket.emit('joinGame', { gameId:'13', userId:'2' });
+        }
+
+        // Call restoreGame when the user reconnects or refreshes the page.
+        window.addEventListener('load', restoreGame);
+    </script>
+</body>
+
+</html>

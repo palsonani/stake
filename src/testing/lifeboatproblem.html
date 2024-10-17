@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lifeboat Problem</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0px 0px 15px rgba(0, 0, 0, 0.1);
+            width: 400px;
+            text-align: center;
+        }
+
+        h1 {
+            color: #333;
+        }
+
+        label {
+            font-weight: bold;
+            margin-top: 10px;
+        }
+
+        input {
+            padding: 8px;
+            margin: 10px 0;
+            width: 100%;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+            font-size: 16px;
+        }
+
+        button {
+            padding: 10px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 10px;
+            width: 100%;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        .result {
+            margin-top: 20px;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Lifeboat Problem</h1>
+        <label for="capacity">Enter Lifeboat Capacity:</label>
+        <input type="number" id="capacity" placeholder="Lifeboat capacity">
+
+        <label for="men">Enter Number of Men:</label>
+        <input type="number" id="men" placeholder="Number of men">
+
+        <label for="women">Enter Number of Women:</label>
+        <input type="number" id="women" placeholder="Number of women">
+
+        <label for="children">Enter Number of Children:</label>
+        <input type="number" id="children" placeholder="Number of children">
+
+        <button onclick="calculateSavedPeople()">Calculate Saved People</button>
+
+        <div class="result" id="result"></div>
+    </div>
+
+    <script>
+        function calculateSavedPeople() {
+            const capacity = parseInt(document.getElementById('capacity').value);
+            let men = parseInt(document.getElementById('men').value);
+            let women = parseInt(document.getElementById('women').value);
+            let children = parseInt(document.getElementById('children').value);
+
+            let boatCapacity = capacity;
+            let peopleSaved = 0;
+            let menSaved = 0;
+            let womenSaved = 0;
+            let childrenSaved = 0;
+
+            // First prioritize saving children
+            while (boatCapacity > 0 && (men > 0 || women > 0 || children > 0)) {
+                if (men > 0 || women > 0) {
+                    let adults = men + women;  // Total number of adults
+
+                    if (adults > 0) {
+                        // One adult (man or woman) can save up to 4 children
+                        let childrenToSave = Math.min(4, children, boatCapacity);
+                        childrenSaved += childrenToSave;
+                        peopleSaved += childrenToSave;
+                        children -= childrenToSave;
+                        boatCapacity -= childrenToSave;
+
+                        // Save one man or woman if there are still boat spaces and children saved
+                        if (childrenToSave > 0 && boatCapacity > 0) {
+                            if (men > 0) {
+                                menSaved++;
+                                men--;
+                            } else if (women > 0) {
+                                womenSaved++;
+                                women--;
+                            }
+                            peopleSaved++;
+                            boatCapacity--;
+                        }
+                    }
+                } else {
+                    break;
+                }
+            }
+
+            // Display results in the HTML
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = `
+                <p>Total people saved: ${peopleSaved}</p>
+                <p>Men saved: ${menSaved}</p>
+                <p>Women saved: ${womenSaved}</p>
+                <p>Children saved: ${childrenSaved}</p>
+            `;
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chat App</title>
+  <style>
+    .chat-container {
+      display: flex;
+      flex-direction: column;
+      width: 300px;
+      height: 500px;
+      border: 1px solid #ccc;
+    }
+
+    .chat-header {
+      padding: 10px;
+      background-color: #f5f5f5;
+    }
+
+    .chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 10px;
+      background-color: #fff;
+    }
+
+    .chat-message {
+      margin-bottom: 10px;
+    }
+
+    .chat-input {
+      display: flex;
+      padding: 10px;
+      background-color: #f5f5f5;
+    }
+
+    .chat-input input {
+      flex: 1;
+      padding: 5px;
+      margin-right: 5px;
+    }
+
+    .chat-input button {
+      padding: 5px 10px;
+    }
+
+    select {
+      width: 100%;
+      padding: 5px;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="chat-container">
+    <div class="chat-header">
+      <select id="countrySelect">
+        <option value="India">India</option>
+        <option value="Deutsch">Deutsch</option>
+        <option value="Français">Français</option>
+        <option value="Türkçe">Türkçe</option>
+        <!-- Add more options as needed -->
+      </select>
+    </div>
+
+    <div class="chat-messages" id="chatMessages"></div>
+
+    <div class="chat-input">
+      <input type="text" id="chatInput" placeholder="Type your message...">
+      <button onclick="sendMessage()">Send</button>
+    </div>
+  </div>
+
+  <!-- Socket.IO script -->
+  <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+  <script>
+    const socket = io('http://192.168.29.203:3002', { path: '/ws' });
+    let country = 'India';
+
+    socket.on('connect', () => {
+      console.log('Connected to server');
+      socket.emit('joinCountry', country); // Join the initial country room
+    });
+
+    socket.on('chatMessage', (newMessage) => {
+      const chatMessages = document.getElementById('chatMessages');
+      const messageElement = document.createElement('div');
+      messageElement.className = 'chat-message';
+      messageElement.innerHTML = `<strong>${newMessage.userId}</strong>: ${newMessage.content}`;
+      chatMessages.appendChild(messageElement);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+    });
+
+    socket.on('changeCountryResponse', (data) => {
+    console.log(data);
+
+    // Check if data is an array before calling .forEach()
+    if (Array.isArray(data)) {
+        data.forEach((item) => {
+            displayMessage(item.userId, item.content); // Adjust if item properties are different
+        });
+    } else {
+        console.error('Expected an array of chat messages but received:', data);
+    }
+});
+
+    function displayMessage(sender, content) {
+      const chatMessages = document.getElementById('chatMessages');
+      const messageElement = document.createElement('div');
+      messageElement.className = 'chat-message';
+      messageElement.innerHTML = `<strong>${sender}</strong>: ${content}`;
+      chatMessages.appendChild(messageElement);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+
+
+    socket.on('disconnect', () => {
+      console.log('Disconnected from server');
+    });
+
+    document.getElementById('countrySelect').addEventListener('change', (event) => {
+      country = event.target.value;
+      const chatBox = document.getElementById('chatMessages'); // Assuming chatBox is the ID of your chat container
+      chatBox.innerHTML = ''; // Clear all messages
+      socket.emit('changeCountry', country);
+    });
+
+    function sendMessage() {
+      const chatInput = document.getElementById('chatInput');
+      if (chatInput.value) {
+        const message = {
+          userId: 'user123',
+          content: chatInput.value,
+          taggedUserId: 'user456',
+        };
+        socket.emit('chatMessage', message);
+        chatInput.value = '';
+      }
+    }
+  </script>
+</body>
+
+</html>

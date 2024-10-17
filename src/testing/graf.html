@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Curved Line Chart</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            background-color: #1e2a38; /* Dark background */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            position: relative;
+        }
+
+        #chartContainer {
+            position: relative;
+            width: 50vh; /* Width based on viewport */
+            height: 50vh; /* Height based on viewport */
+        }
+
+        canvas {
+            width: 100%; /* Full width */
+            height: 100%; /* Full height */
+        }
+
+        #multiplier {
+            position: absolute;
+            color: white;
+            font-size: 1rem;
+            font-family: Arial, sans-serif;
+            text-align: center;
+            top: 50%;
+            left: 60%;
+            transform: translate(-50%, -50%);
+            pointer-events: none; /* Allows clicks to pass through the text */
+        }
+    </style>
+</head>
+<body>
+    <div id="chartContainer">
+        <!-- Multiplier display -->
+        <div id="multiplier">1x</div>
+        
+        <!-- Curved line chart canvas -->
+        <canvas id="curvedLineChart"></canvas>
+    </div>
+
+    <script>
+        const ctx = document.getElementById('curvedLineChart').getContext('2d');
+
+        // Create a gradient for the fill
+        const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+        gradient.addColorStop(1, 'rgba(255, 165, 0, 0.5)'); // Bright orange
+        gradient.addColorStop(0, 'rgba(255, 165, 0, 0)'); // Transparent
+
+        const data = {
+            labels: [1], // Start X axis labels from 1
+            datasets: [{
+                label: 'Smooth Curved Line',
+                data: [1], // Start from 1 on the Y-axis
+                borderColor: 'rgba(255, 255, 255, 1)', // White line    
+                borderWidth: 6,
+                fill: true, // Enable filling below the line
+                backgroundColor: gradient, // Gradient fill
+                tension: 0.75, // Moderate tension for a smoother curve across all points
+                pointRadius: 0, // Hide all points initially
+                pointBackgroundColor: 'rgba(255, 255, 255, 1)' // White point background for last dot
+            }]
+        };
+
+        // Create the chart
+        const chart = new Chart(ctx, {
+            type: 'line',
+            data: data,
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Seconds',
+                            color: '#fff'
+                        },
+                        ticks: {
+                            color: '#fff',
+                            callback: function() {
+                                return ''; // Hide X-axis labels
+                            }
+                        },
+                        grid: {
+                            display: false, // Remove X-axis grid lines
+                        },
+                        min: 1, // Start X axis from 1
+                        suggestedMin: 1, // Ensure the graph starts from 1
+                        beginAtZero: false // Prevent it from starting at 0
+                    },
+                    y: {
+                        title: {
+                            display: true,
+                            text: 'Multiplier',
+                            color: '#fff'
+                        },
+                        ticks: {
+                            color: '#fff'
+                        },
+                        grid: {
+                            display: false, // Remove Y-axis grid lines
+                        },
+                        min: 1, // Start Y axis from 1
+                        max: 100 // End at 100
+                    }
+                },
+                animation: {
+                    duration: 0, // Disable default animation for immediate updates
+                },
+                plugins: {
+                    legend: {
+                        display: false // Hide legend
+                    }
+                }
+            }
+        });
+
+        // Function to add data points incrementally
+        function addSmoothDataPoints() {
+            let xValue = 1;  // Start from 1 on the X-axis (seconds)
+            let yValue = 1;  // Start from 1 on the Y-axis (multiplier)
+            const increment = 0.1;  // Step size for smooth increments
+            const yMax = 100; // Maximum Y value for the curve
+
+            const interval = setInterval(function() {
+                if (yValue < yMax) {
+                    // Increment the X and Y values
+                    xValue += increment;
+                    yValue += increment * (yValue ** 0.5); // Adjust to create the exponential curve
+
+                    // Add the new data point to both X and Y axes
+                    chart.data.labels.push(xValue.toFixed(1));  // Add X label (seconds)
+                    chart.data.datasets[0].data.push(yValue.toFixed(2));  // Add Y value (multiplier)
+
+                    // Show the end point with a larger radius at the last data point
+                    chart.data.datasets[0].pointRadius = chart.data.datasets[0].data.map((val, index) => {
+                        return index === chart.data.datasets[0].data.length - 1 ? 6 : 0; // Larger point at last data point
+                    });
+
+                    // Update the multiplier in the middle of the chart
+                    document.getElementById('multiplier').textContent = yValue.toFixed(2) + "x";
+
+                    // Update the chart to display the new point and larger endpoint dot
+                    chart.update('silent');  // Update silently without animation
+                } else {
+                    clearInterval(interval);  // Stop when Y reaches yMax
+                }
+            }, 50);  // Update every 10ms for smooth animation
+        }
+
+        // Start adding data points after the chart is ready
+        addSmoothDataPoints();
+    </script>
+</body>
+</html>

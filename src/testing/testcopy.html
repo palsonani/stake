@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ball Drawing Simulation</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        .container {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            width: 300px;
+        }
+
+        h1 {
+            color: #333;
+        }
+
+        .input-group {
+            margin: 15px 0;
+        }
+
+        label {
+            display: block;
+            font-size: 14px;
+            margin-bottom: 5px;
+        }
+
+        input {
+            padding: 5px;
+            font-size: 16px;
+            width: 100%;
+        }
+
+        button {
+            padding: 10px 15px;
+            font-size: 16px;
+            background-color: #5cb85c;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 15px;
+        }
+
+        button:hover {
+            background-color: #4cae4c;
+        }
+
+        .result {
+            margin-top: 20px;
+            font-size: 18px;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Ball Drawing Simulation</h1>
+        <div class="input-group">
+            <label for="whiteBalls">Number of White Balls:</label>
+            <input type="number" id="whiteBalls" value="2" min="0">
+        </div>
+        <div class="input-group">
+            <label for="blackBalls">Number of Black Balls:</label>
+            <input type="number" id="blackBalls" value="2" min="0">
+        </div>
+        <button id="startBtn">Start Simulation</button>
+        <div id="result" class="result"></div>
+    </div>
+
+    <script>
+        document.getElementById('startBtn').addEventListener('click', function() {
+            let whiteBalls = parseInt(document.getElementById('whiteBalls').value);
+            let blackBalls = parseInt(document.getElementById('blackBalls').value);
+
+            // Start the simulation until only one ball is left
+            while (whiteBalls + blackBalls > 1) {
+                if (whiteBalls >= 2) {
+                    // Case: two white balls drawn
+                    whiteBalls -= 2;
+                    whiteBalls += 1; // Add one white ball back
+                } else if (blackBalls >= 2) {
+                    // Case: two black balls drawn
+                    blackBalls -= 2;
+                    whiteBalls += 1; // Add one white ball back
+                } else if (whiteBalls >= 1 && blackBalls >= 1) {
+                    // Case: one white and one black ball drawn
+                    whiteBalls -= 1;
+                    blackBalls -= 1;
+                    blackBalls += 1; // Add one black ball back
+                }
+            }
+
+            // Determine the last remaining ball color
+            let resultText = whiteBalls === 1 ? "The last ball is White." : "The last ball is Black.";
+            
+            // Display the result
+            document.getElementById('result').innerText = resultText;
+        });
+    </script>
+</body>
+</html>

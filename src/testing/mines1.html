@@ -1,0 +1,260 @@
+import { sequelize } from '../config/connection.js';
+import Bet from '../models/Bet.js';
+import MineLocation from '../models/MineLocation.js';
+
+export const minesSocketHandler = (io) => {
+    io.on('connection', (socket) => {
+        console.log('New user connected for mines game'); // Log when a user connects
+        let betId;
+
+        socket.on('startGame', async (data) => {
+            console.log('Start game request received:', data);
+            const { userId, gameId, totalMines } = data;
+
+            // Create a new bet record
+            const bet = await Bet.create({ gameId, userId, mines: totalMines });
+            betId = bet.id;
+            console.log('New bet created:', bet);
+
+            // Initialize game board with 25 tiles (0 to 24)
+            for (let tileIndex = 0; tileIndex < 25; tileIndex++) {
+                await MineLocation.create({
+                    gameId,
+                    userId,
+                    tileIndex,
+                    isMine: false,
+                    betId: bet.id // Associate with the new bet
+                });
+                console.log(`Tile created: ${tileIndex}, isMine: false`);
+            }
+
+            socket.emit('gameStarted', { gameId, betId: bet.id });
+            console.log('Game started and emitted:', { gameId, betId: bet.id });
+        });
+
+        socket.on('selectTile', async (data) => {
+            console.log('Tile selection request received:', data);
+            const { gameId, userId, tileIndex } = data;
+
+            try {
+                const result = await selectTile(gameId, userId, tileIndex, betId); // Pass betId
+                if (result.gameOver) {
+                    console.log('Game over for user:', userId);
+
+                    // Send remaining mine locations to the frontend
+                    const remainingMines = await getRemainingMines(gameId, userId, betId);
+                    socket.emit('gameOver', { multiplier: result.multiplier, remainingMines });
+                } else {
+                    console.log('Tile selected:', { tileIndex, multiplier: result.multiplier });
+                    socket.emit('tileSelected', { multiplier: result.multiplier });
+                }
+            } catch (error) {
+                console.error('Error selecting tile:', error.message);
+                socket.emit('error', { message: error.message });
+            }
+        });
+
+        socket.on('restoreGame', async (data) => {
+            console.log('Restore game request received:', data);
+            const { gameId, userId } = data;
+            const gameState = await restoreGameState(gameId, userId,betId);
+            socket.emit('gameRestored', gameState);
+            console.log('Game restored for user:', userId, gameState);
+        });
+
+        socket.on('cashout', async (data) => {
+            const { gameId, userId, betId } = data;
+
+            try {
+                // Retrieve the current game state and multiplier
+                const selectedTiles = await MineLocation.count({
+                    where: { gameId, userId, selected: true, isMine: false, betId }
+                });
+                const finalMultiplier = 1.00 + selectedTiles * 0.25; // Example multiplier calculation
+
+                // Finalize the bet by marking it as a win (or save the final multiplier)
+                const bet = await Bet.findOne({ where: { id: betId, gameId, userId } });
+                if (bet) {
+                    bet.status = 'win'; // Mark the bet as a win
+                    bet.finalMultiplier = finalMultiplier; // Save the final multiplier
+                    bet.isActive = false;
+                    await bet.save();
+                }
+
+                console.log('User cashed out successfully:', { userId, finalMultiplier });
+                socket.emit('cashoutSuccess', { multiplier: finalMultiplier });
+            } catch (error) {
+                console.error('Error during cashout:', error.message);
+                socket.emit('error', { message: 'Cashout failed. Please try again.' });
+            }
+        });
+
+    });
+
+    async function selectTile(gameId, userId, tileIndex, betId) {
+        console.log('Selecting tile:', { gameId, userId, tileIndex });
+        const bet = await Bet.findOne({
+            where: {
+                id: betId,
+                userId,
+                gameId,
+            }
+        });
+
+        // Check if the bet exists
+        if (!bet) {
+            console.error('Bet not found for user:', userId);
+            throw new Error('Bet not found');
+        }
+
+        const selectedTiles = await MineLocation.count({
+            where: { gameId, userId, selected: true, isMine: false, betId: bet.id } // Added betId check
+        });
+
+        const currentMultiplier = 1.00 + selectedTiles * 0.25; // Example multiplier calculation
+        console.log('Current multiplier:', currentMultiplier);
+
+        // Check if the current multiplier has reached the threshold to set the next mine
+        if (2.00 <= currentMultiplier) {
+            console.log('Setting next tile as mine for user:', userId);
+            // Set the next tile as a mine
+            await setNextTileAsMine(gameId, userId, tileIndex, bet.id); // Pass betId
+        }
+
+        const tile = await MineLocation.findOne({ where: { gameId, userId, tileIndex, betId: bet.id } }); // Added betId check
+        console.log("Bet ID:", bet.id);
+
+        // Check if the tile was found
+        if (!tile) {
+            console.error('Tile not found for index:', tileIndex);
+            throw new Error('Tile not found');
+        }
+
+        if (tile.isMine) {
+            // Game over: User clicked on a mine
+            console.log('User clicked on a mine:', userId);
+
+            // Mark bet as inactive (game over)
+            bet.isActive = false;
+            await bet.save();
+
+            return { gameOver: true, multiplier: 0 };
+        } else {
+            // Continue game, increase multiplier
+            tile.selected = true;
+            await tile.save();
+            console.log('Tile selected successfully:', tileIndex);
+            return { gameOver: false, multiplier: currentMultiplier + 0.25 };
+        }
+    }
+
+    // Get remaining mine locations after a mine is revealed
+    async function getRemainingMines(gameId, userId, betId) {
+        console.log('Getting remaining mines for:', { gameId, userId });
+
+        // Get all mine locations for the game that are mines and not yet selected
+        const remainingMines = await MineLocation.findAll({
+            where: {
+                gameId,
+                userId,
+                isMine: true,
+                selected: false,
+                betId,
+            }
+        });
+
+        return remainingMines.map(tile => tile.tileIndex); // Return the tile indices of remaining mines
+    }
+
+    // Set the next selected tile as a mine and randomly place the remaining mines
+    async function setNextTileAsMine(gameId, userId, tileIndex, betId) {
+        console.log('Setting next tile as mine:', { gameId, userId, tileIndex });
+        const nextTile = await MineLocation.findOne({
+            where: { gameId, userId, tileIndex, betId } // Added betId check
+        });
+
+        // Set current selected tile as a mine
+        if (nextTile) {
+            nextTile.isMine = true;
+            await nextTile.save();
+            console.log('Tile set as mine:', tileIndex);
+        }
+
+        // Randomly place remaining mines in unselected tiles
+        const remainingMines = await getUnselectedTiles(gameId, userId, betId); // Pass betId
+        for (let i = 0; i < remainingMines.length; i++) {
+            remainingMines[i].isMine = true;
+            await remainingMines[i].save();
+            console.log('Remaining mine placed:', remainingMines[i].tileIndex);
+        }
+    }
+
+    // Get unselected tiles where no mine is placed
+    async function getUnselectedTiles(gameId, userId, betId) {
+        console.log('Getting unselected tiles for:', { gameId, userId });
+
+        const bet = await Bet.findOne({ where: { gameId, userId, id: betId } });
+        if (!bet) {
+            throw new Error('Bet not found');
+        }
+
+        // Ensure limit is not negative
+        const limit = Math.max(0, bet.mines - 1); // Ensures limit is at least 0
+
+        return await MineLocation.findAll({
+            where: {
+                gameId,
+                userId,
+                selected: false,
+                isMine: false,
+                betId
+            },
+            order: sequelize.random(),
+            limit: limit
+        });
+    }
+
+    // Restore game state for the user
+    // Restore game state for the user based on userId, betId, gameId, and isActive status
+    async function restoreGameState(gameId, userId, betId) {
+        console.log('Restoring game state for:', { gameId, userId, betId });
+
+        // Find the active bet based on userId, betId, and gameId
+        const activeBet = await Bet.findOne({
+            where: {
+                id: betId, // Ensure the specific bet is referenced
+                gameId,
+                userId,
+                isActive: true // Only restore if the game is still active
+            }
+        });
+
+        if (!activeBet) {
+            throw new Error('No active game found to restore.');
+        }
+
+        // Retrieve the state of all tiles for the given game, user, and bet
+        const tiles = await MineLocation.findAll({
+            where: {
+                gameId,
+                userId,
+                betId: activeBet.id // Match the betId for the active bet
+            },
+            order: [['tileIndex', 'ASC']]
+        });
+
+        console.log('Tiles found for game restoration:', tiles.length);
+
+        // Format the tile data for the frontend
+        return {
+            betId: activeBet.id,
+            betAmount: activeBet.betAmount,
+            multiplier: activeBet.multiplier,
+            tiles: tiles.map(tile => ({
+                index: tile.tileIndex,
+                isMine: tile.isMine,
+                selected: tile.selected
+            }))
+        };
+    }
+};
