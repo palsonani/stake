@@ -113,7 +113,7 @@ export const minesSocketHandler = (io) => {
             });
 
             betId = bet.id;
-
+try{
             // Initialize game board with 25 tiles (0 to 24)
             for (let tileIndex = 0; tileIndex < 25; tileIndex++) {
                 await MineLocation.create({
@@ -125,7 +125,10 @@ export const minesSocketHandler = (io) => {
                 });
                 console.log(`Tile created: ${tileIndex}, isMine: false`);
             }
-            
+        }
+        catch{
+            console.log('Game started and emitted:', { gameId, betId: bet.id });
+        } 
             socket.emit('gameStarted', { gameId, betId: bet.id });
             console.log('Game started and emitted:', { gameId, betId: bet.id });
         })

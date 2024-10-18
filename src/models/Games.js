@@ -2,6 +2,7 @@ import { DataTypes, Model } from 'sequelize';
 import { sequelize } from '../config/connection.js';
 import AmountDistribution from './AmountDistribution.js';
 import Pull from './Pull.js';
+import Bet from './Bet.js';
 
 class Games extends Model {
 }
@@ -35,5 +36,5 @@ Games.init({
 Games.hasMany(AmountDistribution, { foreignKey: 'gameId', as: 'amount_distributions' });
 Games.hasMany(Pull, { foreignKey: 'gameId', as: 'pulls' })
 AmountDistribution.belongsTo(Games, { foreignKey: 'gameId', as: 'game' });
-
+Bet.belongsTo(Games, {foreignKey: 'gameId',as: 'game',onDelete: 'CASCADE'});
 export default Games;

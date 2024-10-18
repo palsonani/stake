@@ -16,6 +16,7 @@ import { firebaseLoginUserMethod } from '../methods/userMethods/firebaseLogin.js
 import { passwordResetToken } from '../methods/forgetPasswordMethods/passwordResetToken.js';
 import { updateUserNotes } from '../methods/userMethods/updateUserNotes.js';
 import { signoutUserMethod } from '../methods/userMethods/logOut.js';
+import { getGameInformationOfUserById } from '../methods/userMethods/information.js';
 
 const userRoutes = express.Router()
 
@@ -36,5 +37,6 @@ userRoutes.post('/logout', signoutUserMethod);
 
 userRoutes.get('/filter',authenticateJWT,authorizeRoles('admin'), userFilter)
 userRoutes.get('/history/:userId',authenticateJWT,authorizeRoles('admin'), getUserHistoryById);
+userRoutes.get('/information/:userId',authenticateJWT,authorizeRoles('admin'),getGameInformationOfUserById)
 
 export default userRoutes
