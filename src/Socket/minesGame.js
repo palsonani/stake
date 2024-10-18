@@ -45,6 +45,7 @@ export const minesSocketHandler = (io) => {
         let betId;
         let bakendMultiplayer;
         let step = 0;
+
         // socket.on('checkActiveBet', async (data) => {
         //     const { userId, gameId } = data;
 
