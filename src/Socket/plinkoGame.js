@@ -86,6 +86,192 @@ async function dropBall(rows, riskLevel, userId, betAmount, distribution) {
 export const plinkoSocketHandler = (io) => {
     io.on("connection", (socket) => {
         console.log("New user connected for Plinko");
+
+        async function placeBet(userId, betAmount, rows, riskLevel) {
+            console.log(userId, betAmount, rows, riskLevel)
+            // Validate row configuration and risk level
+            if (!rowConfigs[rows]) {
+                return { success: false, error: 'Invalid number of rows' };
+            }
+            if (!['low', 'medium', 'high'].includes(riskLevel)) {
+                return { success: false, error: 'Invalid risk level' };
+            }
+            const results = [];
+            try {
+                const wallet = await Wallet.findOne({ where: { userId } });
+                if (!wallet) {
+                    return { success: false, error: 'Wallet not found' };
+                }
+
+                // if (wallet.currentAmount < betAmount * autoBetCount) {
+                //     return { success: false, error: 'Insufficient funds' };
+                // }
+
+                const wallet1 = await Wallet.update(
+                    { currentAmount: wallet.currentAmount - betAmount },
+                    { where: { userId } }
+                );
+
+                io.to(userId).emit("walletBalance", {
+                    walletBalance: wallet1.currentAmount
+                });
+
+                await WalletTransaction.create({
+                    walletId: wallet.id,
+                    userId,
+                    amount: betAmount || 0,
+                    transactionType: 'bet',
+                    transactionDirection: 'debit',
+                    description: `Placed  bets of ${betAmount} each`,
+                    transactionTime: new Date()
+                });
+
+                await FinancialTransaction.create({
+                    gameId: 9,
+                    walletId: wallet.id,
+                    userId,
+                    amount: betAmount || 0,
+                    transactionType: 'bet',
+                    transactionDirection: 'credit',
+                    description: `Placed  bets of ${betAmount} each`,
+                    transactionTime: new Date()
+                });
+
+                // Simulate the ball drop
+                const distribution = await AmountDistribution.findOne({
+                    where: {
+                        userId,
+                        gameId: 9
+                    }
+                });
+                // if(distribution)
+                // {
+                //     const { dropPosition, multiplier } = await dropBall(rows, riskLevel, userId, betAmount, distribution);
+                // }
+                // else{
+                //     const { dropPosition, multiplier } = await dropBall(rows, riskLevel, userId, betAmount, distribution);
+                // }
+                const { dropPosition, multiplier } = await dropBall(rows, riskLevel, userId, betAmount, distribution);
+                // console.log("dropPosition, multiplier::", dropPosition, multiplier);
+
+                let finalMultiplier = multiplier;
+
+                // Check AmountDistribution and adjust multiplier
+
+                // if (distribution) {
+                //     // const profit = betAmount * (multiplier - 1);
+                //     // console.log("profit",profit)
+                //     if (distribution.amount > 0) {
+                //         finalMultiplier = Math.max(1.1, multiplier);
+                //         const winAmount = betAmount * finalMultiplier;
+                //         const profit = winAmount - betAmount;
+                //         await AmountDistribution.update(
+                //             { amount: distribution.amount - profit },
+                //             { where: { id: distribution.id } }
+                //         );
+                //     } else {
+                //         // Not enough amount in distribution
+                //         await AmountDistribution.update(
+                //             { amount: 0, status: 'inactive' },
+                //             { where: { id: distribution.id } }
+                //         );
+                //         finalMultiplier = Math.max(1.1, multiplier);
+                //     }
+                // } else {
+                //     finalMultiplier = multiplier;
+                // }
+
+                const winAmount = betAmount * finalMultiplier;
+                console.log("winAmount::", winAmount);
+
+                // Store the bet result in the database
+
+                const bet = await Bet.create({
+                    gameId: 9,
+                    userId,
+                    betAmount,
+                    multiplier,
+                    winAmount,
+                    rows,
+                    risk: riskLevel,
+                    betTime: new Date()
+                });
+
+                // console.log(`Result: Multiplier=${multiplier}, Position=${dropPosition}, WinAmount=${winAmount}`);
+                // results.push({ finalMultiplier, dropPosition, winAmount });
+                results.push({ finalMultiplier, dropPosition, winAmount, rows, riskLevel, userId, betId: bet.id });
+                // console.log("results::::", results,bet.betId)
+            } catch (error) {
+                console.error('Error saving bet:', error);
+                return { success: false, error: 'Failed to process bet' };
+            }
+
+            return { success: true, results };
+        }
+
+        async function emitBetResult(result, socket) {
+            console.log("jfhhg:", result);
+
+            result.results.forEach(async (result) => {
+                console.log("jfhhg:", result);
+
+                const outcome = result.dropPosition;
+
+                // Ensure the rowConfigs and outcomes exist to avoid undefined errors
+                if (!rowConfigs[result.rows] || !rowConfigs[result.rows][result.riskLevel] || !outcomes[result.rows]) {
+                    console.error("Invalid configuration for rows or riskLevel.");
+                    socket.emit("error", "Invalid configuration for rows or riskLevel.");
+                    return;
+                }
+
+                const multiplier = rowConfigs[result.rows][result.riskLevel][outcome];
+                const possibleOutcomes = outcomes[result.rows][outcome];
+
+                const pattern = [];
+                for (let i = 0; i < result.rows; i++) {
+                    pattern.push(Math.random() > 0.5 ? "R" : "L");
+                }
+                if (autoBetSessions[result.userId]) {
+                    // Emit the bet result
+                    socket.emit("plinkoBetResult", {
+                        point: possibleOutcomes[Math.floor(Math.random() * possibleOutcomes.length)],
+                        multiplier,
+                        pattern,
+                        remainingBets: autoBetSessions[result.userId].remainingBets,
+                        betId: result.betId
+                    });
+                }
+                else {
+                    console.log("result.betId = ", result);
+                    // console.log("results11111.betId = " ,results.betId);
+
+
+                    socket.emit("plinkoBetResult", {
+                        point: possibleOutcomes[Math.floor(Math.random() * possibleOutcomes.length)],
+                        multiplier,
+                        pattern,
+                        betId: result.betId
+                    });
+                }
+                // Fetch the last 4 bets from the database asynchronously
+                try {
+                    const lastBets = await Bet.findAll({
+                        where: { userId: result.userId, gameId: 9 }, // Fetch bets for the specific user
+                        order: [['betTime', 'DESC']],
+                        limit: 4
+                    });
+
+                    const lastMultipliers = lastBets.map(bet => bet.multiplier);
+                    console.log("Last four multipliers:", lastMultipliers);
+
+                    // Emit the last 4 multipliers to the client
+                    socket.emit('lastFourMultipliers', { multipliers: lastMultipliers });
+                } catch (error) {
+                    console.error("Error fetching last bets:", error);
+                }
+            });
+        }
+
         io.emit('plinkoConnection', { message: 'new plinkoConnection', socket: socket.id });
         let roomName;
         socket.on('joinGame', (gameId) => {
@@ -158,6 +344,57 @@ export const plinkoSocketHandler = (io) => {
                 socket.leave(roomName);
             }
         });
+
+        socket.on('betCompleted', async (data) => {
+            console.log("betCompletedbetCompleted")
+            try {
+                const wallet = await Wallet.findOne({ where: { userId: data.userId } });
+                if (!wallet) {
+                    return { success: false, error: 'Wallet not found' };
+                }
+                const bet = await Bet.findByPk(data.betId);
+
+                await Bet.update(
+                    { isActive: false },
+                    { where: { id: data.betId } }
+                );
+
+                await Wallet.update(
+                    { currentAmount: wallet.currentAmount + bet.winAmount },
+                    { where: { userId: data.userId } }
+                );
+
+                await WalletTransaction.create({
+                    walletId: wallet.id,
+                    userId:data.userId,
+                    amount: bet.winAmount,
+                    transactionType: 'win',
+                    transactionDirection: 'credit',
+                    description: `Won amount ${bet.winAmount}`,
+                    transactionTime: new Date(),
+                });
+
+                await FinancialTransaction.create({
+                    gameId: 9,
+                    walletId: wallet.id,
+                    userId:data.userId,
+                    amount: bet.winAmount,
+                    transactionType: 'win',
+                    transactionDirection: 'debit',
+                    description: `Won amount ${bet.winAmount}`,
+                    transactionTime: new Date(),
+                });
+                socket.emit("walletBalance", {
+                    walletBalance: wallet.currentAmount
+                });
+
+            } catch (error) {
+                console.log(error);
+
+            }
+
+        });
+
     });
 
 };
@@ -223,6 +460,7 @@ async function placeBet(userId, betAmount, rows, riskLevel) {
     if (!['low', 'medium', 'high'].includes(riskLevel)) {
         return { success: false, error: 'Invalid risk level' };
     }
+    const results = [];
     try {
         const wallet = await Wallet.findOne({ where: { userId } });
         if (!wallet) {
@@ -233,13 +471,14 @@ async function placeBet(userId, betAmount, rows, riskLevel) {
         //     return { success: false, error: 'Insufficient funds' };
         // }
 
-        const results = [];
-
-
-        await Wallet.update(
+        const wallet1 = await Wallet.update(
             { currentAmount: wallet.currentAmount - betAmount },
             { where: { userId } }
         );
+
+        socket.emit("walletBalance", {
+            walletBalance: wallet1.currentAmount
+        });
 
         await WalletTransaction.create({
             walletId: wallet.id,
@@ -309,32 +548,6 @@ async function placeBet(userId, betAmount, rows, riskLevel) {
         const winAmount = betAmount * finalMultiplier;
         console.log("winAmount::", winAmount);
 
-        await Wallet.update(
-            { currentAmount: wallet.currentAmount + winAmount },
-            { where: { userId } }
-        );
-
-        await WalletTransaction.create({
-            walletId: wallet.id,
-            userId,
-            amount: winAmount,
-            transactionType: 'win',
-            transactionDirection: 'credit',
-            description: `Won amount ${winAmount}`,
-            transactionTime: new Date(),
-        });
-
-        await FinancialTransaction.create({
-            gameId: 9,
-            walletId: wallet.id,
-            userId,
-            amount: winAmount,
-            transactionType: 'win',
-            transactionDirection: 'debit',
-            description: `Won amount ${winAmount}`,
-            transactionTime: new Date(),
-        });
-
         // Store the bet result in the database
 
         const bet = await Bet.create({
@@ -350,7 +563,7 @@ async function placeBet(userId, betAmount, rows, riskLevel) {
 
         // console.log(`Result: Multiplier=${multiplier}, Position=${dropPosition}, WinAmount=${winAmount}`);
         // results.push({ finalMultiplier, dropPosition, winAmount });
-        results.push({ finalMultiplier, dropPosition, winAmount, rows, riskLevel, userId });
+        results.push({ finalMultiplier, dropPosition, winAmount, rows, riskLevel, userId, betId: bet.betId });
         // console.log("results::::", results)
     } catch (error) {
         console.error('Error saving bet:', error);
@@ -391,60 +604,3 @@ async function placeBet(userId, betAmount, rows, riskLevel) {
 //         socket.emit('lastFourMultipliers', { multipliers: lastMultipliers });
 //     });
 // }
-
-async function emitBetResult(result, socket) {
-    console.log("jfhhg:", result);
-
-    result.results.forEach(async (result) => {
-        console.log("jfhhg:", result);
-
-        const outcome = result.dropPosition;
-
-        // Ensure the rowConfigs and outcomes exist to avoid undefined errors
-        if (!rowConfigs[result.rows] || !rowConfigs[result.rows][result.riskLevel] || !outcomes[result.rows]) {
-            console.error("Invalid configuration for rows or riskLevel.");
-            socket.emit("error", "Invalid configuration for rows or riskLevel.");
-            return;
-        }
-
-        const multiplier = rowConfigs[result.rows][result.riskLevel][outcome];
-        const possibleOutcomes = outcomes[result.rows][outcome];
-
-        const pattern = [];
-        for (let i = 0; i < result.rows; i++) {
-            pattern.push(Math.random() > 0.5 ? "R" : "L");
-        }
-        if (autoBetSessions[result.userId]) {
-            // Emit the bet result
-            socket.emit("plinkoBetResult", {
-                point: possibleOutcomes[Math.floor(Math.random() * possibleOutcomes.length)],
-                multiplier,
-                pattern,
-                remainingBets: autoBetSessions[result.userId].remainingBets
-            });
-        }
-        else {
-            socket.emit("plinkoBetResult", {
-                point: possibleOutcomes[Math.floor(Math.random() * possibleOutcomes.length)],
-                multiplier,
-                pattern
-            });
-        }
-        // Fetch the last 4 bets from the database asynchronously
-        try {
-            const lastBets = await Bet.findAll({
-                where: { userId: result.userId, gameId: 9 }, // Fetch bets for the specific user
-                order: [['betTime', 'DESC']],
-                limit: 4
-            });
-
-            const lastMultipliers = lastBets.map(bet => bet.multiplier);
-            console.log("Last four multipliers:", lastMultipliers);
-
-            // Emit the last 4 multipliers to the client
-            socket.emit('lastFourMultipliers', { multipliers: lastMultipliers });
-        } catch (error) {
-            console.error("Error fetching last bets:", error);
-        }
-    });
-}
