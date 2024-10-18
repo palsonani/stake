@@ -11,7 +11,7 @@ export const getWallet = async (req, res) => {
     const user = await User.findByPk(userId);
 
     try {
-        const wallet = await Wallet.findByPk(userId);
+        const wallet = await Wallet.findOne({ where: {userId} });
 
         if (!wallet) {
             return res.status(404).json({ message: 'Wallet not found' });

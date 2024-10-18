@@ -9,7 +9,7 @@ export const createWallet = async (req, res) => {
         return res.status(400).json({ message: 'userId is required!' });
     }
     const user = await User.findByPk(userId);
-    const wallet = await Wallet.findByPk(userId);
+    const wallet = await Wallet.findOne({ where: {userId} });
 
     if (wallet) {
         return res.status(400).json({ message: 'wallet alrady exist!' });
