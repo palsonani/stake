@@ -33,10 +33,10 @@ export const minesSocketHandler = (io) => {
                 // Restore game state
                 const gameState = await restoreGameState(data.gameId, data.userId, betId);
                 step = gameState.totalSelectedTiles
-                const currentMultiplier = calculateIncrement(gameState.mines, step-1);
+                const currentMultiplier = calculateIncrement(gameState.mines, step - 1);
                 socket.emit('gameRestored', gameState, currentMultiplier);
-                console.log('Game restored for user:', data.userId, gameState,currentMultiplier);
-                console.log('currentMultipliercurrentMultiplier::',currentMultiplier)
+                console.log('Game restored for user:', data.userId, gameState, currentMultiplier);
+                console.log('currentMultipliercurrentMultiplier::', currentMultiplier)
                 return;
             }
 
@@ -74,61 +74,64 @@ export const minesSocketHandler = (io) => {
             console.log('Start game request received:', data);
             step = 0;
             const { userId, gameId, totalMines, betAmount } = data;
-            bakendMultiplayer =await getBackendMultiplier(userId, gameId, totalMines)
+            bakendMultiplayer = await getBackendMultiplier(userId, gameId, totalMines)
             // Create a new bet record
-            const bet = await Bet.create({ gameId, userId, mines: totalMines,multiplier:bakendMultiplayer,betType:'manual' });
+            const bet = await Bet.create({ gameId, userId, mines: totalMines, multiplier: bakendMultiplayer, betType: 'manual' });
+            try {
+                const wallet = await Wallet.findOne({ where: { userId } });
+                if (!wallet) {
+                    return { success: false, error: 'Wallet not found' };
+                }
+                if (wallet.currentAmount < betAmount) {
+                    io.to(userId).emit('Insufficientfund', { message: 'Insufficient funds', status: true });
+                    return;
+                }
+                await Wallet.update(
+                    { currentAmount: wallet.currentAmount - betAmount },
+                    { where: { userId } }
+                );
 
-            const wallet = await Wallet.findOne({ where: { userId } });
-            if (!wallet) {
-                return { success: false, error: 'Wallet not found' };
+                await WalletTransaction.create({
+                    walletId: wallet.id,
+                    userId,
+                    amount: betAmount,
+                    transactionType: 'bet',
+                    transactionDirection: 'debit',
+                    description: `Placed  bets of ${betAmount} each`,
+                    transactionTime: new Date()
+                });
+
+                await FinancialTransaction.create({
+                    gameId: gameId,
+                    walletId: wallet.id,
+                    userId,
+                    amount: betAmount,
+                    transactionType: 'bet',
+                    transactionDirection: 'credit',
+                    description: `Placed  bets of ${betAmount} each`,
+                    transactionTime: new Date()
+                });
+            } catch (error) {
+                console.log('error in transaction', error);
             }
-            if (wallet.currentAmount < betAmount) {
-                io.to(userId).emit('Insufficientfund', { message: 'Insufficient funds', status: true });
-                return;
-            }
-            await Wallet.update(
-                { currentAmount: wallet.currentAmount - betAmount },
-                { where: { userId } }
-            );
-        
-            await WalletTransaction.create({
-                walletId: wallet.id,
-                userId,
-                amount: betAmount,
-                transactionType: 'bet',
-                transactionDirection: 'debit',
-                description: `Placed  bets of ${betAmount} each`,
-                transactionTime: new Date()
-            });
-        
-            await FinancialTransaction.create({
-                gameId: gameId,
-                walletId: wallet.id,
-                userId,
-                amount: betAmount,
-                transactionType: 'bet',
-                transactionDirection: 'credit',
-                description: `Placed  bets of ${betAmount} each`,
-                transactionTime: new Date()
-            });
 
             betId = bet.id;
-try{
-            // Initialize game board with 25 tiles (0 to 24)
-            for (let tileIndex = 0; tileIndex < 25; tileIndex++) {
-                await MineLocation.create({
-                    gameId,
-                    userId,
-                    tileIndex,
-                    isMine: false,
-                    betId: bet.id // Associate with the new bet
-                });
-                console.log(`Tile created: ${tileIndex}, isMine: false`);
+            try {
+                // Initialize game board with 25 tiles (0 to 24)
+                for (let tileIndex = 0; tileIndex < 25; tileIndex++) {
+                    await MineLocation.create({
+                        gameId,
+                        userId,
+                        tileIndex,
+                        isMine: false,
+                        betId: bet.id // Associate with the new bet
+                    });
+                    console.log(`Tile created: ${tileIndex}, isMine: false`);
+                }
             }
-        }
-        catch{
-            console.log('Game started and emitted:', { gameId, betId: bet.id });
-        } 
+            catch {
+                console.log('Game started and emitted:', { gameId, betId: bet.id });
+            }
             socket.emit('gameStarted', { gameId, betId: bet.id });
             console.log('Game started and emitted:', { gameId, betId: bet.id });
         })
@@ -182,11 +185,11 @@ try{
                 // Retrieve the current game state and multiplier
                 const gameState = await restoreGameState(data.gameId, data.userId, betId);
                 step = gameState.totalSelectedTiles
-                const currentMultiplier = calculateIncrement(gameState.mines, step-1);
+                const currentMultiplier = calculateIncrement(gameState.mines, step - 1);
 
                 // Finalize the bet by marking it as a win (or save the final multiplier)
                 const bet = await Bet.findOne({ where: { id: betId, gameId, userId } });
-                const winAmount = bet.betAmount * currentMultiplier; 
+                const winAmount = bet.betAmount * currentMultiplier;
                 if (bet) {
                     bet.cashOutAt = currentMultiplier; // Save the final multiplier
                     bet.isActive = false;
@@ -198,12 +201,12 @@ try{
                 socket.emit('cashoutSuccess', { multiplier: currentMultiplier });
 
                 const wallet = await Wallet.findOne({ where: { userId } });
-                
+
                 await Wallet.update(
                     { currentAmount: wallet.currentAmount + winAmount },
                     { where: { userId } }
                 );
-            
+
                 await WalletTransaction.create({
                     walletId: wallet.id,
                     userId,
@@ -213,7 +216,7 @@ try{
                     description: `Won amount ${winAmount}`,
                     transactionTime: new Date(),
                 });
-            
+
                 await FinancialTransaction.create({
                     gameId: gameId,
                     walletId: wallet.id,
@@ -224,7 +227,7 @@ try{
                     description: `Won amount ${winAmount}`,
                     transactionTime: new Date(),
                 });
-            
+
 
             } catch (error) {
                 console.error('Error during cashout:', error.message);
@@ -275,11 +278,11 @@ try{
         const currentMultiplier = baseIncrement;
         console.log('Current multiplier:', currentMultiplier);
         let finalbakendMultiplayer
-        if(bet.multiplier){
-             finalbakendMultiplayer=bet.multiplier
+        if (bet.multiplier) {
+            finalbakendMultiplayer = bet.multiplier
         }
-        else{
-            finalbakendMultiplayer=bakendMultiplayer
+        else {
+            finalbakendMultiplayer = bakendMultiplayer
         }
         console.log("bakendMultiplayerbakendMultiplayer::", finalbakendMultiplayer);
 

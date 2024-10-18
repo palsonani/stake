@@ -46,143 +46,190 @@ export const crashSocketHandler = (io) => {
         });
 
         socket.on('placeBet', async (data) => {
-            const { userId, amount, cashoutMultiplier, betType, numberOfBets, onWins, onLoss, stopOnProfit, stopOnLoss } = data;
-            console.log(data)
-            socket.join(userId)
-            const user = await User.findOne({ where: { id: userId } });
-            if (!user) {
-                socket.emit('error', { message: 'User not found', status: true });
-                return;
-            }
-            if (!user.isActive) {
-                io.to(userId).emit('inActiveUser', { message: 'Your Account is Disable Please Contact Support Team', status: true });
-                return;
-            }
-            const username = user.userName;
-            console.log(data)
-            // Check if it's an auto bet
-            if (betType === 'Auto') {
-                handleAutoBet({
-                    userId,
-                    amount,
-                    cashoutMultiplier,
-                    numberOfBets,
-                    betType,
-                    onWins,
-                    onLoss,
-                    stopOnProfit,
-                    stopOnLoss,
-                    username
-                });
-            } else {
-                console.log('Attempting to place bet:', { isGameRunning, countdownStarted });
-
-                if (isGameRunning && countdownStarted) {
-                    totalBetAmount += amount;
-                    try {
-                        const wallet = await Wallet.findOne({ where: { userId } });
-                        if (!wallet) throw new Error('Wallet not found');
-
-                        if (wallet.currentAmount < amount) {
-                            io.to(userId).emit('Insufficientfund', { message: 'Insufficient funds', status: true });
-                            return;
-                        }
-
-                        await Wallet.update(
-                            { currentAmount: wallet.currentAmount - amount },
-                            { where: { userId } }
-                        );
-
-                        await WalletTransaction.create({
-                            walletId: wallet.id,
-                            userId,
-                            amount,
-                            transactionType: 'bet',
-                            transactionDirection: 'debit',
-                            description: `Placed a bet of ${amount}`,
-                            transactionTime: new Date()
-                        });
-
-                        await FinancialTransaction.create({
-                            gameId: 1,
-                            walletId: wallet.id,
-                            userId,
-                            amount,
-                            transactionType: 'bet',
-                            transactionDirection: 'credit',
-                            description: `Placed a bet of ${amount}`,
-                            transactionTime: new Date()
-                        });
-
-                        const newBet = await Bet.create({
-                            userId,
-                            gameId: 1,
-                            betType,
-                            betAmount: amount,
-                            cashOutAt: cashoutMultiplier,
-                            multiplier: cashoutMultiplier,
-                            betTime: new Date(),
-                        });
-
-                        // Update player list
-                        const existingPlayerIndex = players.findIndex(player => player.id === socket.id);
-                        if (existingPlayerIndex >= 0) {
-                            players[existingPlayerIndex].amount += amount;
-                            players[existingPlayerIndex].cashoutMultiplier = cashoutMultiplier;
-                        } else {
-                            players.push({ id: socket.id, betId: newBet.id, userId, username, amount, cashoutMultiplier });
-                            console.log(players)
-                            console.log(newBet.id)
-                        }
-
-                        io.emit('gameStatus', {
-                            status: 'Betting period in progress...',
-                            totalBetAmount,
-                            players,
-                            autoBets
-                        });
-                        console.log("players who placed bet::", players, autoBets)
-                    } catch (error) {
-                        console.error('Error placing bet:', error);
-                        socket.emit('error', { message: 'Could not place bet. Please try again.' });
-                    }
-                } else {
-                    console.log('Cannot place bets at this time. Status:', { isGameRunning, countdownStarted });
-                    socket.emit('error', { message: 'Cannot place bets at this time. Please wait for the next round.' });
+            const {
+                userId, amount, cashoutMultiplier, betType,
+                numberOfBets, onWins, onLoss, stopOnProfit, stopOnLoss
+            } = data;
+        
+            try {
+                console.log(data);
+                socket.join(userId);
+        
+                const user = await User.findOne({ where: { id: userId } });
+                if (!user) {
+                    socket.emit('error', { message: 'User not found', status: true });
+                    return;
                 }
+                if (!user.isActive) {
+                    io.to(userId).emit('inActiveUser', { 
+                        message: 'Your Account is Disabled. Please Contact Support Team.', 
+                        status: true 
+                    });
+                    return;
+                }
+        
+                const username = user.userName;
+                console.log(data);
+        
+                // Auto-bet handling
+                if (betType === 'Auto') {
+                    handleAutoBet({
+                        userId, amount, cashoutMultiplier, numberOfBets, betType,
+                        onWins, onLoss, stopOnProfit, stopOnLoss, username
+                    });
+                } else {
+                    console.log('Attempting to place bet:', { isGameRunning, countdownStarted });
+        
+                    if (isGameRunning && countdownStarted) {
+                        totalBetAmount += amount;
+        
+                        try {
+                            const wallet = await Wallet.findOne({ where: { userId } });
+                            if (!wallet) throw new Error('Wallet not found');
+        
+                            if (wallet.currentAmount < amount) {
+                                io.to(userId).emit('Insufficientfund', {
+                                    message: 'Insufficient funds',
+                                    status: true
+                                });
+                                return;
+                            }
+        
+                            // Deduct amount from the wallet
+                            await Wallet.update(
+                                { currentAmount: wallet.currentAmount - amount },
+                                { where: { userId } }
+                            );
+        
+                            // Record wallet transaction
+                            await WalletTransaction.create({
+                                walletId: wallet.id,
+                                userId,
+                                amount,
+                                transactionType: 'bet',
+                                transactionDirection: 'debit',
+                                description: `Placed a bet of ${amount}`,
+                                transactionTime: new Date()
+                            });
+        
+                            // Record financial transaction
+                            await FinancialTransaction.create({
+                                gameId: 1,
+                                walletId: wallet.id,
+                                userId,
+                                amount,
+                                transactionType: 'bet',
+                                transactionDirection: 'credit',
+                                description: `Placed a bet of ${amount}`,
+                                transactionTime: new Date()
+                            });
+        
+                            // Create bet record
+                            const newBet = await Bet.create({
+                                userId,
+                                gameId: 1,
+                                betType,
+                                betAmount: amount,
+                                cashOutAt: cashoutMultiplier,
+                                multiplier: cashoutMultiplier,
+                                betTime: new Date(),
+                            });
+        
+                            // Update player list
+                            const existingPlayerIndex = players.findIndex(player => player.id === socket.id);
+                            if (existingPlayerIndex >= 0) {
+                                players[existingPlayerIndex].amount += amount;
+                                players[existingPlayerIndex].cashoutMultiplier = cashoutMultiplier;
+                            } else {
+                                players.push({
+                                    id: socket.id,
+                                    betId: newBet.id,
+                                    userId,
+                                    username,
+                                    amount,
+                                    cashoutMultiplier
+                                });
+                                console.log(players);
+                                console.log(newBet.id);
+                            }
+        
+                            // Emit updated game status
+                            io.emit('gameStatus', {
+                                status: 'Betting period in progress...',
+                                totalBetAmount,
+                                players,
+                                autoBets
+                            });
+                            console.log("Players who placed bet::", players, autoBets);
+                        } catch (error) {
+                            console.error('Error placing bet:', error);
+                            socket.emit('error', { message: 'Could not place bet. Please try again.' });
+                        }
+                    } else {
+                        console.log('Cannot place bets at this time. Status:', { isGameRunning, countdownStarted });
+                        socket.emit('error', { 
+                            message: 'Cannot place bets at this time. Please wait for the next round.' 
+                        });
+                    }
+                }
+            } catch (error) {
+                console.error('Unexpected error:', error);
+                socket.emit('error', { message: 'An unexpected error occurred. Please try again.' });
             }
         });
-
+        
         // Listen for cancel bet event
         socket.on('cancelBet', async (data) => {
             const { userId, betId } = data;
-            console.log(data);
-            console.log(`Cancel bet request received: userId=${userId}, betId=${betId}`);
-
-            // Check if the game is still in the betting period
-            if (countdownStarted) {
-                // Remove manual bet
+        
+            try {
+                console.log(data);
+                console.log(`Cancel bet request received: userId=${userId}, betId=${betId}`);
+        
+                // Check if the game is still in the betting period
+                if (!countdownStarted) {
+                    console.log(`Betting period has ended. Cancellation request: userId=${userId}, betId=${betId}`);
+                    socket.emit('error', { message: 'Betting period has ended. Cannot cancel bets.' });
+                    return;
+                }
+        
+                // Find the bet
+                let bet;
                 try {
-                    const bet = await Bet.findOne({ where: { id: betId, userId } });
+                    bet = await Bet.findOne({ where: { id: betId, userId } });
                     if (!bet) {
                         console.log(`Bet not found: userId=${userId}, betId=${betId}`);
                         socket.emit('error', { message: 'Bet not found' });
                         return;
                     }
-
-                    const wallet = await Wallet.findOne({ where: { userId } });
+                } catch (error) {
+                    console.error('Error retrieving bet:', error);
+                    socket.emit('error', { message: 'Error retrieving bet. Please try again.' });
+                    return;
+                }
+        
+                // Find the wallet
+                let wallet;
+                try {
+                    wallet = await Wallet.findOne({ where: { userId } });
                     if (!wallet) {
                         console.log(`Wallet not found: userId=${userId}`);
                         socket.emit('error', { message: 'Wallet not found' });
                         return;
                     }
-
-                    // Refund the bet amount
+                } catch (error) {
+                    console.error('Error retrieving wallet:', error);
+                    socket.emit('error', { message: 'Error retrieving wallet. Please try again.' });
+                    return;
+                }
+        
+                // Refund the bet amount
+                try {
                     await Wallet.update(
                         { currentAmount: wallet.currentAmount + bet.betAmount },
                         { where: { userId } }
                     );
-
+        
                     await WalletTransaction.create({
                         walletId: wallet.id,
                         userId,
@@ -192,7 +239,7 @@ export const crashSocketHandler = (io) => {
                         description: `Refunded bet amount of ${bet.betAmount}`,
                         transactionTime: new Date()
                     });
-
+        
                     await FinancialTransaction.create({
                         gameId: 1,
                         walletId: wallet.id,
@@ -203,26 +250,28 @@ export const crashSocketHandler = (io) => {
                         description: `Refunded bet amount of ${bet.betAmount}`,
                         transactionTime: new Date()
                     });
-
+        
                     // Remove the bet
                     await Bet.destroy({ where: { id: betId, userId } });
-
-                    console.log("bet.betType", bet.betType)
+        
+                    console.log("bet.betType", bet.betType);
+        
                     // Check if this is an auto bet and stop it
                     if (bet.betType === 'Auto') {
                         console.log(`Ending auto bet for user ${userId}`);
                         endAutoBet(userId);
-
+        
                         // Remove the user from the autoBets list
                         autoBets = autoBets.filter(autoBet => autoBet.userId !== userId);
                         console.log("after auto bets cancel:", autoBets);
                         console.log(`Removed user ${userId} from autoBets list`);
                     }
+        
                     // Update the player list
                     players = players.filter(player => player.id !== socket.id);
-
+        
                     console.log(`Bet successfully canceled: userId=${userId}, betId=${betId}`);
-
+        
                     io.emit('gameStatus', {
                         status: 'Betting period in progress...',
                         totalBetAmount,
@@ -230,15 +279,15 @@ export const crashSocketHandler = (io) => {
                         autoBets
                     });
                 } catch (error) {
-                    console.error('Error canceling bet:', error);
+                    console.error('Error processing refund and removing bet:', error);
                     socket.emit('error', { message: 'Could not cancel bet. Please try again.' });
                 }
-            } else {
-                console.log(`Betting period has ended. Cancellation request: userId=${userId}, betId=${betId}`);
-                socket.emit('error', { message: 'Betting period has ended. Cannot cancel bets.' });
+            } catch (error) {
+                console.error('Unexpected error during bet cancellation:', error);
+                socket.emit('error', { message: 'An unexpected error occurred. Please try again.' });
             }
         });
-
+        
         socket.on('disconnect', () => {
             console.log('Disconnected from the CrashGame server');
             if (roomName) {
@@ -258,97 +307,138 @@ export const crashSocketHandler = (io) => {
             stopOnLoss,
             username
         }) => {
-            const wallet = await Wallet.findOne({ where: { userId } });
-            if (!wallet) throw new Error('Wallet not found');
-
-            // Check if the user has enough balance for the total number of bets
-            const totalBetCost = amount * numberOfBets;
-            console.log()
-            if (wallet.currentAmount < totalBetCost) {
-                io.to(userId).emit('Insufficientfund', { message: 'Insufficient funds for auto bets', status: true });
-                console.log("Insufficientfunds")
-                return;
-            }
-
-            // Deduct the amount for the first auto bet
-            await Wallet.update(
-                { currentAmount: wallet.currentAmount - amount },
-                { where: { userId } }
-            );
-
-            // Create a wallet transaction for the auto bet deduction
-            await WalletTransaction.create({
-                walletId: wallet.id,
-                userId,
-                amount,
-                transactionType: 'bet',
-                transactionDirection: 'debit',
-                description: `Placed an auto bet of ${amount}`,
-                transactionTime: new Date()
-            });
-
-            await FinancialTransaction.create({
-                gameId: 1,
-                walletId: wallet.id,
-                userId,
-                amount,
-                transactionType: 'bet',
-                transactionDirection: 'credit',
-                description: `Placed an auto bet of ${amount}`,
-                transactionTime: new Date()
-            });
-
-            const newAutoBet = await Bet.create({
-                userId,
-                gameId: 1,
-                betType,
-                betAmount: amount,
-                cashOutAt: cashoutMultiplier,
-                multiplier: cashoutMultiplier,
-                betTime: new Date(),
-                numberOfBets,
-                onWins,
-                onLoss,
-                stopOnProfit,
-                stopOnLoss,
-            });
-
-
-            const existingAutoBetIndex = autoBets.findIndex(autoBet => autoBet.userId === userId && autoBet.cashoutMultiplier === cashoutMultiplier);
-            if (existingAutoBetIndex >= 0) {
-                // Update existing auto bet
-                autoBets[existingAutoBetIndex].numberOfBets += numberOfBets;
-                if (stopOnProfit !== null) autoBets[existingAutoBetIndex].stopOnProfit = stopOnProfit;
-                if (stopOnLoss !== null) autoBets[existingAutoBetIndex].stopOnLoss = stopOnLoss;
-                console.log(`Updated auto bet for user ${userId}:`, autoBets[existingAutoBetIndex]);
-            } else {
-                // Add new auto bet
-                autoBets.push({
-                    userId,
-                    username,
-                    amount,
-                    cashoutMultiplier,
-                    numberOfBets,
-                    onWins,
-                    onLoss,
-                    stopOnProfit,
-                    stopOnLoss,
-                    betId: newAutoBet.id,
-                    placedBets: 0,
-                    totalProfit: 0,
-                    totalLoss: 0,
-                });
-                io.emit('gameStatus', {
-                    status: 'Game in started...',
-                    totalBetAmount,
-                    players,
-                    autoBets
-                });
-
-                console.log(`Added new auto bet for user ${userId}:`, autoBets[autoBets.length - 1]);
+            try {
+                // Find the user's wallet
+                let wallet;
+                try {
+                    wallet = await Wallet.findOne({ where: { userId } });
+                    if (!wallet) throw new Error('Wallet not found');
+                } catch (error) {
+                    console.error(`Error retrieving wallet for user ${userId}:`, error);
+                    io.to(userId).emit('error', { message: 'Error retrieving wallet. Please try again.' });
+                    return;
+                }
+        
+                // Check if the user has enough balance
+                const totalBetCost = amount * numberOfBets;
+                if (wallet.currentAmount < totalBetCost) {
+                    io.to(userId).emit('Insufficientfund', { message: 'Insufficient funds for auto bets', status: true });
+                    console.log("Insufficient funds for auto bets");
+                    return;
+                }
+        
+                // Deduct the amount for the first auto bet
+                try {
+                    await Wallet.update(
+                        { currentAmount: wallet.currentAmount - amount },
+                        { where: { userId } }
+                    );
+                } catch (error) {
+                    console.error(`Error deducting wallet amount for user ${userId}:`, error);
+                    io.to(userId).emit('error', { message: 'Error processing bet amount deduction. Please try again.' });
+                    return;
+                }
+        
+                // Create wallet transaction
+                try {
+                    await WalletTransaction.create({
+                        walletId: wallet.id,
+                        userId,
+                        amount,
+                        transactionType: 'bet',
+                        transactionDirection: 'debit',
+                        description: `Placed an auto bet of ${amount}`,
+                        transactionTime: new Date()
+                    });
+        
+                    await FinancialTransaction.create({
+                        gameId: 1,
+                        walletId: wallet.id,
+                        userId,
+                        amount,
+                        transactionType: 'bet',
+                        transactionDirection: 'credit',
+                        description: `Placed an auto bet of ${amount}`,
+                        transactionTime: new Date()
+                    });
+                } catch (error) {
+                    console.error(`Error creating transactions for user ${userId}:`, error);
+                    io.to(userId).emit('error', { message: 'Error processing transactions. Please try again.' });
+                    return;
+                }
+        
+                // Create the auto bet
+                let newAutoBet;
+                try {
+                    newAutoBet = await Bet.create({
+                        userId,
+                        gameId: 1,
+                        betType,
+                        betAmount: amount,
+                        cashOutAt: cashoutMultiplier,
+                        multiplier: cashoutMultiplier,
+                        betTime: new Date(),
+                        numberOfBets,
+                        onWins,
+                        onLoss,
+                        stopOnProfit,
+                        stopOnLoss,
+                    });
+                } catch (error) {
+                    console.error(`Error creating auto bet for user ${userId}:`, error);
+                    io.to(userId).emit('error', { message: 'Error placing auto bet. Please try again.' });
+                    return;
+                }
+        
+                // Check if there's an existing auto bet for the user
+                try {
+                    const existingAutoBetIndex = autoBets.findIndex(
+                        autoBet => autoBet.userId === userId && autoBet.cashoutMultiplier === cashoutMultiplier
+                    );
+        
+                    if (existingAutoBetIndex >= 0) {
+                        // Update existing auto bet
+                        autoBets[existingAutoBetIndex].numberOfBets += numberOfBets;
+                        if (stopOnProfit !== null) autoBets[existingAutoBetIndex].stopOnProfit = stopOnProfit;
+                        if (stopOnLoss !== null) autoBets[existingAutoBetIndex].stopOnLoss = stopOnLoss;
+                        console.log(`Updated auto bet for user ${userId}:`, autoBets[existingAutoBetIndex]);
+                    } else {
+                        // Add new auto bet
+                        autoBets.push({
+                            userId,
+                            username,
+                            amount,
+                            cashoutMultiplier,
+                            numberOfBets,
+                            onWins,
+                            onLoss,
+                            stopOnProfit,
+                            stopOnLoss,
+                            betId: newAutoBet.id,
+                            placedBets: 0,
+                            totalProfit: 0,
+                            totalLoss: 0,
+                        });
+        
+                        io.emit('gameStatus', {
+                            status: 'Game started...',
+                            totalBetAmount,
+                            players,
+                            autoBets
+                        });
+        
+                        console.log(`Added new auto bet for user ${userId}:`, autoBets[autoBets.length - 1]);
+                    }
+                } catch (error) {
+                    console.error(`Error handling auto bet for user ${userId}:`, error);
+                    io.to(userId).emit('error', { message: 'Error processing auto bet. Please try again.' });
+                }
+            } catch (error) {
+                console.error('Unexpected error during auto bet processing:', error);
+                io.to(userId).emit('error', { message: 'An unexpected error occurred. Please try again.' });
             }
         };
-
+        
         // const calculateCrashPoint = async () => {
         //     console.log('Calculating crash point...');
         //     if (players.length === 0 && autoBets.length === 0) {
@@ -618,6 +708,7 @@ export const crashSocketHandler = (io) => {
         //     io.emit('endRound', { crashPoint });
         //     console.log('Game ended with crashPoint:', crashPoint);
         // };
+       
         const calculateCrashPoint = async () => {
             console.log('Calculating crash point...');
 
@@ -1049,6 +1140,7 @@ export const crashSocketHandler = (io) => {
                 }, 2000); // 2 seconds before the game starts
             }, 10000); // 10-second betting period
         };
+
         // const startNewGame = () => {
         //     if (isGameRunning) return;
 
@@ -1113,6 +1205,7 @@ export const crashSocketHandler = (io) => {
         //         }, 2000); // 2 seconds before the game starts
         //     }, 10000); // 10-second betting period
         // };
+        
         startNewGame()
     });
 

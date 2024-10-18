@@ -86,7 +86,7 @@ async function dropBall(rows, riskLevel, userId, betAmount, distribution) {
 export const plinkoSocketHandler = (io) => {
     io.on("connection", (socket) => {
         console.log("New user connected for Plinko");
-        io.emit('plinkoConnection', { message: 'new plinkoConnection',socket:socket.id });
+        io.emit('plinkoConnection', { message: 'new plinkoConnection', socket: socket.id });
         let roomName;
         socket.on('joinGame', (gameId) => {
             const roomName = `game_${gameId.gameId}`;
@@ -124,7 +124,7 @@ export const plinkoSocketHandler = (io) => {
 
         // Handle stopping the auto-bet process
         socket.on("stopAutoBet", (data) => {
-    
+
             const userId = data.userId;
 
             if (!userId || typeof userId !== 'number') {
@@ -223,120 +223,120 @@ async function placeBet(userId, betAmount, rows, riskLevel) {
     if (!['low', 'medium', 'high'].includes(riskLevel)) {
         return { success: false, error: 'Invalid risk level' };
     }
-
-    const wallet = await Wallet.findOne({ where: { userId } });
-    if (!wallet) {
-        return { success: false, error: 'Wallet not found' };
-    }
-
-    // if (wallet.currentAmount < betAmount * autoBetCount) {
-    //     return { success: false, error: 'Insufficient funds' };
-    // }
-
-    const results = [];
-
-
-    await Wallet.update(
-        { currentAmount: wallet.currentAmount - betAmount },
-        { where: { userId } }
-    );
-
-    await WalletTransaction.create({
-        walletId: wallet.id,
-        userId,
-        amount: betAmount || 0,
-        transactionType: 'bet',
-        transactionDirection: 'debit',
-        description: `Placed  bets of ${betAmount} each`,
-        transactionTime: new Date()
-    });
-
-    await FinancialTransaction.create({
-        gameId: 9,
-        walletId: wallet.id,
-        userId,
-        amount: betAmount || 0,
-        transactionType: 'bet',
-        transactionDirection: 'credit',
-        description: `Placed  bets of ${betAmount} each`,
-        transactionTime: new Date()
-    });
-
-    // Simulate the ball drop
-    const distribution = await AmountDistribution.findOne({
-        where: {
-            userId,
-            gameId: 9
-        }
-    });
-    // if(distribution)
-    // {
-    //     const { dropPosition, multiplier } = await dropBall(rows, riskLevel, userId, betAmount, distribution);
-    // }
-    // else{
-    //     const { dropPosition, multiplier } = await dropBall(rows, riskLevel, userId, betAmount, distribution);
-    // }
-    const { dropPosition, multiplier } = await dropBall(rows, riskLevel, userId, betAmount, distribution);
-    // console.log("dropPosition, multiplier::", dropPosition, multiplier);
-
-    let finalMultiplier = multiplier;
-
-    // Check AmountDistribution and adjust multiplier
-
-    // if (distribution) {
-    //     // const profit = betAmount * (multiplier - 1);
-    //     // console.log("profit",profit)
-    //     if (distribution.amount > 0) {
-    //         finalMultiplier = Math.max(1.1, multiplier);
-    //         const winAmount = betAmount * finalMultiplier;
-    //         const profit = winAmount - betAmount;
-    //         await AmountDistribution.update(
-    //             { amount: distribution.amount - profit },
-    //             { where: { id: distribution.id } }
-    //         );
-    //     } else {
-    //         // Not enough amount in distribution
-    //         await AmountDistribution.update(
-    //             { amount: 0, status: 'inactive' },
-    //             { where: { id: distribution.id } }
-    //         );
-    //         finalMultiplier = Math.max(1.1, multiplier);
-    //     }
-    // } else {
-    //     finalMultiplier = multiplier;
-    // }
-
-    const winAmount = betAmount * finalMultiplier;
-    console.log("winAmount::", winAmount);
-
-    await Wallet.update(
-        { currentAmount: wallet.currentAmount + winAmount },
-        { where: { userId } }
-    );
-
-    await WalletTransaction.create({
-        walletId: wallet.id,
-        userId,
-        amount: winAmount,
-        transactionType: 'win',
-        transactionDirection: 'credit',
-        description: `Won amount ${winAmount}`,
-        transactionTime: new Date(),
-    });
-
-    await FinancialTransaction.create({
-        gameId: 9,
-        walletId: wallet.id,
-        userId,
-        amount: winAmount,
-        transactionType: 'win',
-        transactionDirection: 'debit',
-        description: `Won amount ${winAmount}`,
-        transactionTime: new Date(),
-    });
-
-    // Store the bet result in the database
     try {
+        const wallet = await Wallet.findOne({ where: { userId } });
+        if (!wallet) {
+            return { success: false, error: 'Wallet not found' };
+        }
+
+        // if (wallet.currentAmount < betAmount * autoBetCount) {
+        //     return { success: false, error: 'Insufficient funds' };
+        // }
+
+        const results = [];
+
+
+        await Wallet.update(
+            { currentAmount: wallet.currentAmount - betAmount },
+            { where: { userId } }
+        );
+
+        await WalletTransaction.create({
+            walletId: wallet.id,
+            userId,
+            amount: betAmount || 0,
+            transactionType: 'bet',
+            transactionDirection: 'debit',
+            description: `Placed  bets of ${betAmount} each`,
+            transactionTime: new Date()
+        });
+
+        await FinancialTransaction.create({
+            gameId: 9,
+            walletId: wallet.id,
+            userId,
+            amount: betAmount || 0,
+            transactionType: 'bet',
+            transactionDirection: 'credit',
+            description: `Placed  bets of ${betAmount} each`,
+            transactionTime: new Date()
+        });
+
+        // Simulate the ball drop
+        const distribution = await AmountDistribution.findOne({
+            where: {
+                userId,
+                gameId: 9
+            }
+        });
+        // if(distribution)
+        // {
+        //     const { dropPosition, multiplier } = await dropBall(rows, riskLevel, userId, betAmount, distribution);
+        // }
+        // else{
+        //     const { dropPosition, multiplier } = await dropBall(rows, riskLevel, userId, betAmount, distribution);
+        // }
+        const { dropPosition, multiplier } = await dropBall(rows, riskLevel, userId, betAmount, distribution);
+        // console.log("dropPosition, multiplier::", dropPosition, multiplier);
+
+        let finalMultiplier = multiplier;
+
+        // Check AmountDistribution and adjust multiplier
+
+        // if (distribution) {
+        //     // const profit = betAmount * (multiplier - 1);
+        //     // console.log("profit",profit)
+        //     if (distribution.amount > 0) {
+        //         finalMultiplier = Math.max(1.1, multiplier);
+        //         const winAmount = betAmount * finalMultiplier;
+        //         const profit = winAmount - betAmount;
+        //         await AmountDistribution.update(
+        //             { amount: distribution.amount - profit },
+        //             { where: { id: distribution.id } }
+        //         );
+        //     } else {
+        //         // Not enough amount in distribution
+        //         await AmountDistribution.update(
+        //             { amount: 0, status: 'inactive' },
+        //             { where: { id: distribution.id } }
+        //         );
+        //         finalMultiplier = Math.max(1.1, multiplier);
+        //     }
+        // } else {
+        //     finalMultiplier = multiplier;
+        // }
+
+        const winAmount = betAmount * finalMultiplier;
+        console.log("winAmount::", winAmount);
+
+        await Wallet.update(
+            { currentAmount: wallet.currentAmount + winAmount },
+            { where: { userId } }
+        );
+
+        await WalletTransaction.create({
+            walletId: wallet.id,
+            userId,
+            amount: winAmount,
+            transactionType: 'win',
+            transactionDirection: 'credit',
+            description: `Won amount ${winAmount}`,
+            transactionTime: new Date(),
+        });
+
+        await FinancialTransaction.create({
+            gameId: 9,
+            walletId: wallet.id,
+            userId,
+            amount: winAmount,
+            transactionType: 'win',
+            transactionDirection: 'debit',
+            description: `Won amount ${winAmount}`,
+            transactionTime: new Date(),
+        });
+
+        // Store the bet result in the database
+
         const bet = await Bet.create({
             gameId: 9,
             userId,
@@ -356,7 +356,6 @@ async function placeBet(userId, betAmount, rows, riskLevel) {
         console.error('Error saving bet:', error);
         return { success: false, error: 'Failed to process bet' };
     }
-
 
     return { success: true, results };
 }

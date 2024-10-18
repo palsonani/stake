@@ -62,165 +62,66 @@ export const limboSocketHandler = (io) => {
     });
 
     const handleManualBet = async (user, betAmount, selectedMultiplier, socket) => {
-        console.log(`Handling manual bet for user ${user.id}, Bet Amount: ${betAmount}, Selected Multiplier: ${selectedMultiplier}`);
-
-        const result = await simulateWinLoss(user.id, selectedMultiplier, betAmount);
-        const { isWin, winAmount, actualMultiplier } = result;
-
-        const wallet = await Wallet.findOne({ where: { userId: user.id } });
-        if (!wallet) {
-            io.to(user.id).emit('WalletNotFound', { message: 'Wallet not found', status: true });
-        }
-
-        if (wallet.currentAmount < betAmount) {
-            io.to(user.id).emit('Insufficientfund', { message: 'Insufficient funds', status: true });
-        }
-
-        await Wallet.update(
-            { currentAmount: wallet.currentAmount - betAmount },
-            { where: { userId: user.id } }
-        );
-
-        await WalletTransaction.create({
-            walletId: wallet.id,
-            userId: user.id,
-            amount: betAmount,
-            transactionType: 'bet',
-            transactionDirection: 'debit',
-            description: `Placed  bets of ${betAmount} each`,
-            transactionTime: new Date()
-        });
-
-        await FinancialTransaction.create({
-            gameId: 14,
-            walletId: wallet.id,
-            userId: user.id,
-            amount: betAmount,
-            transactionType: 'bet',
-            transactionDirection: 'credit',
-            description: `Placed  bets of ${betAmount} each`,
-            transactionTime: new Date()
-        });
-
-        const newBet = await Bet.create({
-            userId: user.id,
-            betAmount,
-            gameId: 14,
-            cashOutAt: selectedMultiplier,
-            multiplier: actualMultiplier,
-            winAmount: isWin ? winAmount : 0,
-            isActive: false,
-            betType: 'manual',
-            betTime: new Date(),
-        });
-
-        await Wallet.update(
-            { currentAmount: wallet.currentAmount + winAmount },
-            { where: { userId: user.id } }
-        );
-
-        await WalletTransaction.create({
-            walletId: wallet.id,
-            userId: user.id,
-            amount: winAmount,
-            transactionType: 'win',
-            transactionDirection: 'credit',
-            description: `Won amount ${winAmount}`,
-            transactionTime: new Date(),
-        });
-
-        await FinancialTransaction.create({
-            gameId: 14,
-            walletId: wallet.id,
-            userId: user.id,
-            amount: winAmount,
-            transactionType: 'win',
-            transactionDirection: 'debit',
-            description: `Won amount ${winAmount}`,
-            transactionTime: new Date(),
-        });
-        // console.log(`Bet record created for user ${user.id}:`, newBet);
-
-
-        io.to(user.id).emit('limbobetResult', {
-            isWin,
-            actualMultiplier,
-            selectedMultiplier,
-        });
-        console.log(socket.emit('limbobetResult', {
-            isWin,
-            actualMultiplier,
-            selectedMultiplier,
-        }));
-
-    };
-
-    const handleAutoBet = async (user, initialBetAmount, autoBetCount, selectedMultiplier, onWinPercentage, onLossPercentage, stopOnProfit, stopOnLoss, socket) => {
-        let currentBetAmount = initialBetAmount;
-        let totalProfit = 0;
-
-        console.log(`Starting auto-bet for user ${user.id}, Initial Bet Amount: ${initialBetAmount}, Auto Bet Count: ${autoBetCount}`);
-        activeAutoBets[user.id] = true;
-        for (let i = 0; i < autoBetCount; i++) {
-            if (!activeAutoBets[user.id]) {
-                console.log(`Auto-bet process stopped for user ${user.id}`);
-                break;
-            }
-            console.log(`Auto-bet round ${i + 1} for user ${user.id}`);
-
-            const result = await simulateWinLoss(user.id, selectedMultiplier, currentBetAmount);
+        try {
+            console.log(`Handling manual bet for user ${user.id}, Bet Amount: ${betAmount}, Selected Multiplier: ${selectedMultiplier}`);
+    
+            const result = await simulateWinLoss(user.id, selectedMultiplier, betAmount);
             const { isWin, winAmount, actualMultiplier } = result;
+    
             const wallet = await Wallet.findOne({ where: { userId: user.id } });
             if (!wallet) {
                 io.to(user.id).emit('WalletNotFound', { message: 'Wallet not found', status: true });
+                return;
             }
-
-            if (wallet.currentAmount < initialBetAmount * autoBetCount) {
+    
+            if (wallet.currentAmount < betAmount) {
                 io.to(user.id).emit('Insufficientfund', { message: 'Insufficient funds', status: true });
+                return;
             }
+    
             await Wallet.update(
-                { currentAmount: wallet.currentAmount - initialBetAmount },
+                { currentAmount: wallet.currentAmount - betAmount },
                 { where: { userId: user.id } }
             );
-
+    
             await WalletTransaction.create({
                 walletId: wallet.id,
                 userId: user.id,
-                amount: initialBetAmount,
+                amount: betAmount,
                 transactionType: 'bet',
                 transactionDirection: 'debit',
-                description: `Placed  bets of ${initialBetAmount} each`,
-                transactionTime: new Date()
+                description: `Placed bets of ${betAmount} each`,
+                transactionTime: new Date(),
             });
-
+    
             await FinancialTransaction.create({
                 gameId: 14,
                 walletId: wallet.id,
                 userId: user.id,
-                amount: initialBetAmount,
+                amount: betAmount,
                 transactionType: 'bet',
                 transactionDirection: 'credit',
-                description: `Placed  bets of ${initialBetAmount} each`,
-                transactionTime: new Date()
+                description: `Placed bets of ${betAmount} each`,
+                transactionTime: new Date(),
             });
-
+    
             const newBet = await Bet.create({
                 userId: user.id,
+                betAmount,
                 gameId: 14,
-                betAmount: currentBetAmount,
                 cashOutAt: selectedMultiplier,
                 multiplier: actualMultiplier,
                 winAmount: isWin ? winAmount : 0,
                 isActive: false,
-                betType: 'auto',
+                betType: 'manual',
                 betTime: new Date(),
             });
-
+    
             await Wallet.update(
                 { currentAmount: wallet.currentAmount + winAmount },
                 { where: { userId: user.id } }
             );
-
+    
             await WalletTransaction.create({
                 walletId: wallet.id,
                 userId: user.id,
@@ -230,7 +131,7 @@ export const limboSocketHandler = (io) => {
                 description: `Won amount ${winAmount}`,
                 transactionTime: new Date(),
             });
-
+    
             await FinancialTransaction.create({
                 gameId: 14,
                 walletId: wallet.id,
@@ -241,44 +142,168 @@ export const limboSocketHandler = (io) => {
                 description: `Won amount ${winAmount}`,
                 transactionTime: new Date(),
             });
-
-            totalProfit += isWin ? winAmount - currentBetAmount : -currentBetAmount;
-
-            // Adjust bet amount based on win/loss percentages only if provided
-            if (isWin) {
-                if (onWinPercentage !== undefined || onWinPercentage !== null) {
-                    currentBetAmount += currentBetAmount * (onWinPercentage / 100);
-                    console.log(`User ${user.id} won. Increasing bet amount to: ${currentBetAmount}`);
-                }
-            } else {
-                if (onLossPercentage !== undefined || onLossPercentage !== null) {
-                    currentBetAmount -= currentBetAmount * (onLossPercentage / 100);
-                    console.log(`User ${user.id} lost. Decreasing bet amount to: ${currentBetAmount}`);
-                }
-            }
-            console.log("adsfasfgsd", stopOnProfit, stopOnLoss)
-            // Stop if profit/loss limits are reached (only check if limits are defined)
-            if (stopOnProfit !== null && totalProfit >= stopOnProfit) {
-                console.log(`Auto-bet stopping for user ${user.id} due to reaching profit limit: ${totalProfit}`);
-                break;
-            }
-            if (stopOnLoss !== null && totalProfit <= stopOnLoss) {
-                console.log(`Auto-bet stopping for user ${user.id} due to reaching loss limit: ${totalProfit}`);
-                break;
-            }
-
-            // Delay for 1 second between bets
-            await new Promise(resolve => setTimeout(resolve, 2000));
+    
             io.to(user.id).emit('limbobetResult', {
                 isWin,
                 actualMultiplier,
                 selectedMultiplier,
-                currentBetAmount,
-                Autobetround: i + 1
+            });
+    
+            console.log(socket.emit('limbobetResult', {
+                isWin,
+                actualMultiplier,
+                selectedMultiplier,
+            }));
+        } catch (error) {
+            console.error('Error handling manual bet:', error);
+            io.to(user.id).emit('betError', {
+                message: 'An error occurred while processing the bet. Please try again.',
+                status: false,
             });
         }
-        delete activeAutoBets[user.id];
-        console.log(`Auto-bet completed for user ${user.id}`);
+    };    
+
+    const handleAutoBet = async (
+        user, initialBetAmount, autoBetCount, selectedMultiplier, 
+        onWinPercentage, onLossPercentage, stopOnProfit, stopOnLoss, socket
+    ) => {
+        try {
+            let currentBetAmount = initialBetAmount;
+            let totalProfit = 0;
+    
+            console.log(`Starting auto-bet for user ${user.id}, Initial Bet Amount: ${initialBetAmount}, Auto Bet Count: ${autoBetCount}`);
+            activeAutoBets[user.id] = true;
+    
+            for (let i = 0; i < autoBetCount; i++) {
+                if (!activeAutoBets[user.id]) {
+                    console.log(`Auto-bet process stopped for user ${user.id}`);
+                    break;
+                }
+    
+                console.log(`Auto-bet round ${i + 1} for user ${user.id}`);
+                const result = await simulateWinLoss(user.id, selectedMultiplier, currentBetAmount);
+                const { isWin, winAmount, actualMultiplier } = result;
+    
+                const wallet = await Wallet.findOne({ where: { userId: user.id } });
+                if (!wallet) {
+                    io.to(user.id).emit('WalletNotFound', { message: 'Wallet not found', status: true });
+                    return;
+                }
+    
+                if (wallet.currentAmount < initialBetAmount * autoBetCount) {
+                    io.to(user.id).emit('Insufficientfund', { message: 'Insufficient funds', status: true });
+                    return;
+                }
+    
+                await Wallet.update(
+                    { currentAmount: wallet.currentAmount - initialBetAmount },
+                    { where: { userId: user.id } }
+                );
+    
+                await WalletTransaction.create({
+                    walletId: wallet.id,
+                    userId: user.id,
+                    amount: initialBetAmount,
+                    transactionType: 'bet',
+                    transactionDirection: 'debit',
+                    description: `Placed bets of ${initialBetAmount} each`,
+                    transactionTime: new Date()
+                });
+    
+                await FinancialTransaction.create({
+                    gameId: 14,
+                    walletId: wallet.id,
+                    userId: user.id,
+                    amount: initialBetAmount,
+                    transactionType: 'bet',
+                    transactionDirection: 'credit',
+                    description: `Placed bets of ${initialBetAmount} each`,
+                    transactionTime: new Date()
+                });
+    
+                const newBet = await Bet.create({
+                    userId: user.id,
+                    gameId: 14,
+                    betAmount: currentBetAmount,
+                    cashOutAt: selectedMultiplier,
+                    multiplier: actualMultiplier,
+                    winAmount: isWin ? winAmount : 0,
+                    isActive: false,
+                    betType: 'auto',
+                    betTime: new Date(),
+                });
+    
+                await Wallet.update(
+                    { currentAmount: wallet.currentAmount + winAmount },
+                    { where: { userId: user.id } }
+                );
+    
+                await WalletTransaction.create({
+                    walletId: wallet.id,
+                    userId: user.id,
+                    amount: winAmount,
+                    transactionType: 'win',
+                    transactionDirection: 'credit',
+                    description: `Won amount ${winAmount}`,
+                    transactionTime: new Date(),
+                });
+    
+                await FinancialTransaction.create({
+                    gameId: 14,
+                    walletId: wallet.id,
+                    userId: user.id,
+                    amount: winAmount,
+                    transactionType: 'win',
+                    transactionDirection: 'debit',
+                    description: `Won amount ${winAmount}`,
+                    transactionTime: new Date(),
+                });
+    
+                totalProfit += isWin ? winAmount - currentBetAmount : -currentBetAmount;
+    
+                // Adjust bet amount based on win/loss percentages only if provided
+                if (isWin && onWinPercentage !== undefined) {
+                    currentBetAmount += currentBetAmount * (onWinPercentage / 100);
+                    console.log(`User ${user.id} won. Increasing bet amount to: ${currentBetAmount}`);
+                } else if (!isWin && onLossPercentage !== undefined) {
+                    currentBetAmount -= currentBetAmount * (onLossPercentage / 100);
+                    console.log(`User ${user.id} lost. Decreasing bet amount to: ${currentBetAmount}`);
+                }
+    
+                console.log("Profit/Loss check:", stopOnProfit, stopOnLoss);
+    
+                // Stop if profit/loss limits are reached
+                if (stopOnProfit !== null && totalProfit >= stopOnProfit) {
+                    console.log(`Auto-bet stopping for user ${user.id} due to reaching profit limit: ${totalProfit}`);
+                    break;
+                }
+                if (stopOnLoss !== null && totalProfit <= stopOnLoss) {
+                    console.log(`Auto-bet stopping for user ${user.id} due to reaching loss limit: ${totalProfit}`);
+                    break;
+                }
+    
+                // Delay between bets
+                await new Promise(resolve => setTimeout(resolve, 2000));
+    
+                io.to(user.id).emit('limbobetResult', {
+                    isWin,
+                    actualMultiplier,
+                    selectedMultiplier,
+                    currentBetAmount,
+                    autoBetRound: i + 1
+                });
+            }
+    
+            delete activeAutoBets[user.id];
+            console.log(`Auto-bet completed for user ${user.id}`);
+    
+        } catch (error) {
+            console.error('Error during auto-bet:', error);
+            io.to(user.id).emit('betError', {
+                message: 'An error occurred during the auto-bet process. Please try again.',
+                status: false
+            });
+        }
     };
 
     // Simulate a dynamic win/loss outcome
@@ -342,102 +367,104 @@ export const limboSocketHandler = (io) => {
     //     return { isWin, winAmount, actualMultiplier };
     // };
     const simulateWinLoss = async (userId, selectedMultiplier, betAmount) => {
-
-        const distribution = await AmountDistribution.findOne({
-            where: { userId: userId, gameId: 14, status: 'active' },
-        });
-        const random = Math.random();
-        let isWin = false;
-        let winAmount = 0;
-        let actualMultiplier = 0;
-        if (distribution) {
-            console.log('Active distribution found, forcing win.');
-            isWin = true;
-            winAmount = betAmount * selectedMultiplier;
-            actualMultiplier = selectedMultiplier + Math.random() * (100 - selectedMultiplier);
-            return { isWin, winAmount, actualMultiplier }; // Return immediately after forcing a win
-        }
-
-        // Update distribution amount if applicable
-        if (distribution && distribution.amount > 0 && distribution.status === "active") {
-            const winAmount = betAmount * selectedMultiplier;
-            const profit = winAmount - betAmount;
-            await AmountDistribution.update(
-                { amount: distribution.amount - profit },
-                { where: { id: distribution.id } }
-            );
-
-        } else if (distribution) {
-            // Set distribution to inactive if amount is not sufficient
-            await AmountDistribution.update(
-                { amount: 0, status: 'inactive' },
-                { where: { id: distribution.id } }
-            );
-        }
-
-        // This function simulates the win/loss outcomes
-
-        let totalProfit = 0
-        // Fetch user's betting history from the database
-        const userHistory = await Bet.findAll({
-            where: { userId, gameId: 14 },
-            attributes: ['winAmount', 'betAmount'],
-        });
-
-        // Calculate the player's overall profit/loss
-        for (let i = 0; i < userHistory.length; i++) {
-            const winAmount = userHistory[i].winAmount || 0; // Default to 0 if winAmount is null/undefined
-            const betAmount = userHistory[i].betAmount;
-
-            // Accumulate profit/loss
-            totalProfit += (winAmount - betAmount);
-        }
-
-        const isPlayerInProfit = totalProfit > 0;
-        console.log("totalProfitsfdhgfdhgf", totalProfit)
-        // Define win/loss patterns
-        const patterns = [
-            { wins: isPlayerInProfit ? 3 : 2, losses: isPlayerInProfit ? 1 : 2 },
-            { wins: isPlayerInProfit ? 2 : 1, losses: isPlayerInProfit ? 2 : 1 },
-            { wins: isPlayerInProfit ? 4 : 1, losses: isPlayerInProfit ? 1 : 3 },
-            { wins: isPlayerInProfit ? 1 : 3, losses: isPlayerInProfit ? 3 : 1 },
-        ];
-
-        // Randomly choose a pattern
-        const chosenPattern = patterns[Math.floor(Math.random() * patterns.length)];
-        let winCount = 0;
-        let lossCount = 0;
-
-        // Execute the pattern
-        for (let i = 0; i < chosenPattern.wins; i++) {
-            if (random > 0.3) { // 50% chance to win
+        try {
+            const distribution = await AmountDistribution.findOne({
+                where: { userId: userId, gameId: 14, status: 'active' },
+            });
+    
+            const random = Math.random();
+            let isWin = false;
+            let winAmount = 0;
+            let actualMultiplier = 0;
+    
+            if (distribution) {
+                console.log('Active distribution found, forcing win.');
                 isWin = true;
                 winAmount = betAmount * selectedMultiplier;
                 actualMultiplier = selectedMultiplier + Math.random() * (100 - selectedMultiplier);
-                winCount++;
-            } else {
-                isWin = false;
-                actualMultiplier = selectedMultiplier - Math.random(); // Simulating a lower backend multiplier
-                lossCount++;
+                return { isWin, winAmount, actualMultiplier }; // Return immediately after forcing a win
             }
-        }
-
-        for (let i = 0; i < chosenPattern.losses; i++) {
-            if (random <= 0.7) { // 50% chance to lose
-                isWin = false;
-                actualMultiplier = selectedMultiplier - Math.random(); // Simulating a lower backend multiplier
-                lossCount++;
-            } else {
-                isWin = true;
-                winAmount = betAmount * selectedMultiplier;
-                actualMultiplier = selectedMultiplier + Math.random() * (100 - selectedMultiplier); // Simulating a higher backend multiplier
-                winCount++;
+    
+            // Update distribution amount if applicable
+            if (distribution && distribution.amount > 0 && distribution.status === "active") {
+                const winAmount = betAmount * selectedMultiplier;
+                const profit = winAmount - betAmount;
+                await AmountDistribution.update(
+                    { amount: distribution.amount - profit },
+                    { where: { id: distribution.id } }
+                );
+            } else if (distribution) {
+                // Set distribution to inactive if amount is not sufficient
+                await AmountDistribution.update(
+                    { amount: 0, status: 'inactive' },
+                    { where: { id: distribution.id } }
+                );
             }
+    
+            let totalProfit = 0;
+    
+            // Fetch user's betting history
+            const userHistory = await Bet.findAll({
+                where: { userId, gameId: 14 },
+                attributes: ['winAmount', 'betAmount'],
+            });
+    
+            // Calculate player's overall profit/loss
+            for (const bet of userHistory) {
+                const winAmount = bet.winAmount || 0;
+                totalProfit += (winAmount - bet.betAmount);
+            }
+    
+            const isPlayerInProfit = totalProfit > 0;
+            console.log("Total Profit:", totalProfit);
+    
+            // Define win/loss patterns
+            const patterns = [
+                { wins: isPlayerInProfit ? 3 : 2, losses: isPlayerInProfit ? 1 : 2 },
+                { wins: isPlayerInProfit ? 2 : 1, losses: isPlayerInProfit ? 2 : 1 },
+                { wins: isPlayerInProfit ? 4 : 1, losses: isPlayerInProfit ? 1 : 3 },
+                { wins: isPlayerInProfit ? 1 : 3, losses: isPlayerInProfit ? 3 : 1 },
+            ];
+    
+            // Choose a random pattern
+            const chosenPattern = patterns[Math.floor(Math.random() * patterns.length)];
+            let winCount = 0;
+            let lossCount = 0;
+    
+            // Execute the chosen pattern
+            for (let i = 0; i < chosenPattern.wins; i++) {
+                if (random > 0.3) {
+                    isWin = true;
+                    winAmount = betAmount * selectedMultiplier;
+                    actualMultiplier = selectedMultiplier + Math.random() * (100 - selectedMultiplier);
+                    winCount++;
+                } else {
+                    isWin = false;
+                    actualMultiplier = selectedMultiplier - Math.random();
+                    lossCount++;
+                }
+            }
+    
+            for (let i = 0; i < chosenPattern.losses; i++) {
+                if (random <= 0.7) {
+                    isWin = false;
+                    actualMultiplier = selectedMultiplier - Math.random();
+                    lossCount++;
+                } else {
+                    isWin = true;
+                    winAmount = betAmount * selectedMultiplier;
+                    actualMultiplier = selectedMultiplier + Math.random() * (100 - selectedMultiplier);
+                    winCount++;
+                }
+            }
+    
+            return { isWin, winAmount, actualMultiplier };
+        } catch (error) {
+            console.error('Error in simulateWinLoss:', error);
+            return { isWin: false, winAmount: 0, actualMultiplier: selectedMultiplier };
         }
-
-        return { isWin, winAmount, actualMultiplier };
     };
-
+    
     const calculateProfitLoss = async (userId) => {
         const bets = await Bet.findAll({ where: { userId, gameId: 14 } });
         let profitLoss = 0;
