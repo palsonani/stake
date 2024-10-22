@@ -8,6 +8,7 @@ import { limboSocketHandler } from '../Socket/limboGame.js';
 import { plinkoSocketHandler } from '../Socket/plinkoGame.js';
 import allowedOrigins from './allowedOrigins.js';
 import { wheelSocketHandler } from '../Socket/wheelGame.js';
+import { dragonTowerSocketHandler } from '../Socket/dragonTowerGame.js';
 
 dotenv.config()
 
@@ -49,6 +50,7 @@ export function setupSockets(app) {
     minesSocketHandler(mineIo);
     limboSocketHandler(limboIo)
     wheelSocketHandler(wheelIo)
+    dragonTowerSocketHandler(dragonTowerIo)
 
     return {
         chatServer,

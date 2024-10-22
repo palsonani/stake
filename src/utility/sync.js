@@ -21,6 +21,7 @@ import { sequelize } from '../config/connection.js';
 // import Coupon from '../models/Coupon.js';
 // import AmountDistribution from '../models/AmountDistribution.js';
 // import MineLocation from '../models/MineLocation.js';
+// import DragonTowerLocation from '../models/DragonTowerLocation.js';
 const syncDatabase = async () => {
     try {
         // await sequelize.drop();
