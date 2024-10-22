@@ -43,7 +43,7 @@ export const minesSocketHandler = (io) => {
         });
 
         let betId;
-        let bakendMultiplayer;
+        let bakendMultiplier;
         let step = 0;
 
         // socket.on('checkActiveBet', async (data) => {
@@ -85,9 +85,9 @@ export const minesSocketHandler = (io) => {
                 io.to(userId).emit('Insufficientfund', { message: 'Insufficient funds', status: true });
                 return;
             }
-            bakendMultiplayer = await getBackendMultiplier(userId, gameId, totalMines)
+            bakendMultiplier = await getBackendMultiplier(userId, gameId, totalMines)
             // Create a new bet record
-            const bet = await Bet.create({ gameId, userId, mines: totalMines, multiplier: bakendMultiplayer, betType: 'manual', betAmount });
+            const bet = await Bet.create({ gameId, userId, mines: totalMines, multiplier: bakendMultiplier, betType: 'manual', betAmount });
             try {
                 const wallet = await Wallet.findOne({ where: { userId } });
 

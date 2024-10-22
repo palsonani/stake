@@ -34,7 +34,7 @@ Bet.init({
         type: DataTypes.DECIMAL(10, 2)
     },
     multiplier: {
-        type: DataTypes.DECIMAL(5, 2)
+        type: DataTypes.DECIMAL(10, 2)
     },
     mines: {
         type: DataTypes.INTEGER
