@@ -26,6 +26,10 @@ Games.init({
         type: DataTypes.BOOLEAN,
         defaultValue: true 
     },
+    isReload:{
+        type: DataTypes.BOOLEAN,
+        defaultValue: false 
+    }
 }, {
     sequelize,
     modelName: 'games',

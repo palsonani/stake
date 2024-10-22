@@ -4,7 +4,7 @@ export const wheelSocketHandler = (io) => {
     let currentRound = null;
 
     io.on('connection', (socket) => {
-        console.log(`Player connected: ${socket.id}`);
+        console.log(`Player connected for wheel Game`);
 
         let isAutoBetPaused = false;
         let autoBetInterval = null;
@@ -18,7 +18,7 @@ export const wheelSocketHandler = (io) => {
             const result = spinWheel(segment, risk); // Spin the wheel and pick a result
 
             const outcome = calculateOutcome(betAmount, result, multiplier);
-            console.log("Outcome:", result, outcome, multiplier);
+            console.log("Outcome:", outcome);
 
             // Broadcast the result
             io.to(socket.id).emit('manualBetResult', outcome);
@@ -27,17 +27,19 @@ export const wheelSocketHandler = (io) => {
         // Handle auto bet logic
         socket.on('autoBet', (autoBetData) => {
             let { betAmount, risk, segment, numberOfBets, onWin, onLoss, stopOnLoss, stopOnProfit } = autoBetData;
+            console.log("autoBetData", autoBetData)
             let remainingBets = numberOfBets;
             let totalProfit = 0;
             let totalLoss = 0;
 
             const runAutoBet = () => {
                 if (remainingBets > 0 && !isAutoBetPaused) {
+
                     const multiplier = getMultiplier(segment, risk);
                     const result = spinWheel(segment, risk);
 
                     const outcome = calculateOutcome(betAmount, result, multiplier);
-
+                    console.log("betAmount, remainingBets, outcome", betAmount, remainingBets, outcome)
                     if (outcome.success) {
                         totalProfit += (outcome.payout - betAmount);
                         betAmount += onWin;
@@ -45,15 +47,17 @@ export const wheelSocketHandler = (io) => {
                         totalLoss += betAmount;
                         betAmount -= onLoss;
                     }
-
-                    if (totalLoss >= stopOnLoss || totalProfit >= stopOnProfit) {
-                        io.to(socket.id).emit('autoBetStop', { totalProfit, totalLoss });
-                        clearInterval(autoBetInterval); // Stop auto-bet interval
-                        return;
+                    if (stopOnLoss || stopOnProfit) {
+                        if (totalLoss >= stopOnLoss || totalProfit >= stopOnProfit) {
+                            io.to(socket.id).emit('autoBetStop', { totalProfit, totalLoss });
+                            clearInterval(autoBetInterval); // Stop auto-bet interval
+                            return;
+                        }
                     }
 
                     remainingBets--;
-                    io.to(socket.id).emit('autoBetResult', { betAmount, remainingBets, totalProfit, totalLoss });
+                    io.to(socket.id).emit('autoBetResult', { betAmount, remainingBets, outcome });
+
                 }
             };
 
@@ -83,7 +87,7 @@ export const wheelSocketHandler = (io) => {
         return rowConfigs[segment][risk];
     }
 
-    function spinWheel(segment, risk) {alias
+    function spinWheel(segment, risk) {
         // Simulate spinning the wheel and return a random integer index
         const maxIndex = rowConfigs[segment][risk].length;
         const result = Math.floor(Math.random() * maxIndex); // Return integer result
@@ -94,7 +98,7 @@ export const wheelSocketHandler = (io) => {
         const success = result > 0; // Success if result isn't 0
         const payout = success ? betAmount * multiplier[result] : 0;
         console.log("Payout calculation:", result, multiplier[result], payout);
-        return { success, payout };
+        return { position: result, multiplier: multiplier[result] };
     }
 
     const rowConfigs = {

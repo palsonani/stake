@@ -2,6 +2,7 @@ import Logs from '../../models/Logs.js';
 import Games from "../../models/Games.js";
 import { addLog } from '../../utility/logs.js';
 import { Op } from 'sequelize';
+import Pull from '../../models/Pull.js';
 
 export const findAllGames = async (req, res) => {
     try {
@@ -48,6 +49,20 @@ export const findAllGames = async (req, res) => {
             return res.status(200).json({ message: "Data not found", response: [] });
         }
 
+        const dataWithIsPull = await Promise.all(games.map(async (item) => {
+            const pull = await Pull.findOne({
+                where: {
+                    gameId: item.id
+                }
+            });
+        
+            return {
+                ...item.get(),
+                isPull: !!pull
+            };
+        }));
+
+
         // Log successful game retrieval
         await addLog(null, 'admin', 'INFO', `Games retrieved successfully: ${games.length} games found`);
 
@@ -56,7 +71,7 @@ export const findAllGames = async (req, res) => {
             // totalGames,
             // totalPages: Math.ceil(totalGames / pageSize),
             // currentPage: pageNumber,
-            games
+            games: dataWithIsPull
         });
     } catch (error) {
         await addLog(null, 'admin', 'ERROR', `Error retrieving games: ${error.message}`, 'SELF');

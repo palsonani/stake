@@ -8,34 +8,34 @@ export const getWallet = async (req, res) => {
     if (!userId) {
         return res.status(400).json({ message: 'userId is required' });
     }
+
     const user = await User.findByPk(userId);
-
     try {
-        const wallet = await Wallet.findOne({ where: {userId} });
-
-        if (!wallet) {
-            return res.status(404).json({ message: 'Wallet not found' });
-        }
         if (!user) {
             return res.status(404).json({ message: 'User not found' });
         }
 
+        const wallet = await Wallet.findOne({ where: { userId } });
+        if (!wallet) {
+            return res.status(404).json({ message: 'Wallet not found' });
+        }
+
         // Add log entry for wallet retrieval
-        await addLog({
-            userId: user.userId,
-            userName: user.userName,
-            actionType: 'get_WALLET',
-            actionDescription: `Retrieved wallet for user ${userId}`,
-            performOn: `wallet:${wallet.id}`
-        });
+        await addLog(
+            String(user.id),         
+            user.userName,           
+            'get_WALLET',            
+            `Retrieved wallet for user ${user.id}`,  
+            `wallet:${wallet.id}`    
+        );
 
         res.status(200).json(wallet);
     } catch (error) {
-        console.error('Error retrieving wallet:', error.message);
+        console.error('Error retrieving wallet:', error);
 
         // Log the error
         await addLog({
-            userId: userId || 'unknown',
+            userId: user ? String(user.id) : 'unknown',  // Ensure userId is a string
             userName: user ? user.userName : 'unknown',
             actionType: 'ERROR',
             actionDescription: `Error retrieving wallet: ${error.message}`,

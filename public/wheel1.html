@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Spin Wheel</title>
+  <style>
+    /* General Styling */
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      background-color: #f0f0f0;
+      margin: 0;
+      font-family: Arial, sans-serif;
+    }
+
+    /* Wheel Container */
+    .wheel-container {
+      position: relative;
+      width: 320px;
+      height: 320px;
+    }
+
+    /* Wheel Design */
+    #wheel {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      border: 8px solid #333;
+      overflow: hidden;
+      transform: rotate(0deg); /* Initial rotation reset to 0 */
+      transition: transform 3s ease-out; /* Smooth spin */
+    }
+
+    /* Wheel Segments */
+    .segment {
+      position: absolute;
+      width: 50%;
+      height: 50%;
+      transform-origin: 100% 100%;
+      transform: rotate(calc(36deg * var(--i))) skewY(-54deg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Styling for Segment Numbers (Centered Like Casino Wheel) */
+    .segment span {
+      position: absolute;
+      transform: rotate(calc(-36deg * var(--i))); /* Counter-rotate text to keep upright */
+      font-size: 24px;
+      font-weight: bold;
+      color: white;
+      text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7); /* Add subtle shadow for better visibility */
+    }
+
+    /* Arrow Design */
+    .arrow {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 0;
+      height: 0;
+      border-left: 15px solid transparent;
+      border-right: 15px solid transparent;
+      border-bottom: 30px solid red;
+      transform: translate(-50%, -160%);
+    }
+
+    /* Controls Section */
+    .controls {
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <!-- Wheel Container -->
+  <div class="wheel-container">
+    <div id="wheel">
+      <!-- 10 Segments of the Wheel -->
+      <div class="segment" style="--i: 0"><span>7</span></div>
+      <div class="segment" style="--i: 1"><span>8</span></div>
+      <div class="segment" style="--i: 2"><span>9</span></div>
+      <div class="segment" style="--i: 3"><span>0</span></div>
+      <div class="segment" style="--i: 4"><span>1</span></div>
+      <div class="segment" style="--i: 5"><span>2</span></div>
+      <div class="segment" style="--i: 6"><span>3</span></div>
+      <div class="segment" style="--i: 7"><span>4</span></div>
+      <div class="segment" style="--i: 8"><span>5</span></div>
+      <div class="segment" style="--i: 9"><span>6</span></div>
+    </div>
+    <div class="arrow"></div> <!-- Arrow at the top -->
+  </div>
+
+  <!-- Controls Section -->
+  <div class="controls">
+    <input type="number" id="indexInput" min="0" max="9" placeholder="Enter index (0-9)">
+    <button onclick="spinWheel()">Spin</button>
+  </div>
+
+  <script>
+    // Function to spin the wheel to a specific index
+    function spinWheel() {
+      const indexInput = document.getElementById('indexInput').value;
+      const index = parseInt(indexInput);
+
+      if (isNaN(index) || index < 0 || index > 9) {
+        alert('Please enter a valid index between 0 and 9.');
+        return;
+      }
+
+      const segmentAngle = 36; // Each segment covers 36 degrees (360 / 10)
+      const randomFullRotations = Math.floor(Math.random() * 5) + 5; // 5 to 9 full rotations
+      const targetAngle = index * segmentAngle; // Calculate the angle for the target index
+
+      // Adjust the wheel so that the arrow points at the correct segment
+      const offsetAngle = 360 - targetAngle;
+
+      // Total rotation: Full rotations + Offset to align segment with arrow
+      const totalAngle = randomFullRotations * 360 + offsetAngle;
+
+      const wheel = document.getElementById('wheel');
+      wheel.style.transform = `rotate(${totalAngle}deg)`;
+    }
+  </script>
+</body>
+</html>

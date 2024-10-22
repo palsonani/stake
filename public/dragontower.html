@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dragon Tower Game</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        .game-container {
+            width: 400px;
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+
+        .tiles {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .tile {
+            width: 70px;
+            height: 70px;
+            background-color: #ccc;
+            border-radius: 5px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            font-size: 18px;
+        }
+
+        .tile.selected {
+            background-color: #76c7c0;
+        }
+
+        .tile.disabled {
+            background-color: #e0e0e0;
+            pointer-events: none;
+        }
+
+        button {
+            margin-top: 20px;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="game-container">
+        <h1>Dragon Tower Game</h1>
+        <p><strong>Wallet Balance:</strong> <span id="wallet-balance">0</span></p>
+        <p><strong>Current Multiplier:</strong> <span id="current-multiplier">1.00</span></p>
+
+        <div class="tiles" id="tiles-container"></div>
+
+        <button id="start-game-btn">Start New Game</button>
+        <button id="cashout-btn" style="display:none;">Cashout</button>
+    </div>
+
+    <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+    <script>
+        const socket = io('http://192.168.29.126:3008', { path: '/ws' });
+
+        let gameId = 17;  // Example game ID
+        let userId = 2;   // Example user ID
+        let difficulty = 'easy'; // Difficulty level
+
+        // Initialize tiles on the UI
+        function createTiles() {
+            const tilesContainer = document.getElementById('tiles-container');
+            tilesContainer.innerHTML = '';
+
+            for (let row = 7; row >= 0; row--) {
+                for (let col = 0; col < 4; col++) {
+                    const tile = document.createElement('div');
+                    tile.classList.add('tile', 'disabled');  // Start disabled
+                    tile.textContent = col;  // Set index 0-3
+
+                    // Add click listener to handle tile selection
+                    tile.addEventListener('click', () => selectTile(row, col));
+
+                    tile.dataset.row = row;
+                    tile.dataset.col = col;
+
+                    tilesContainer.appendChild(tile);
+                }
+            }
+        }
+
+        // Enable and disable tile rows
+        function enableRow(row) {
+            document.querySelectorAll(`.tile[data-row='${row}']`)
+                .forEach(tile => tile.classList.remove('disabled'));
+        }
+
+        function disableRow(row) {
+            document.querySelectorAll(`.tile[data-row='${row}']`)
+                .forEach(tile => tile.classList.add('disabled'));
+        }
+
+        // Handle tile selection
+        function selectTile(row, col) {
+            console.log(`Tile selected - Row: ${row}, Index: ${col}`);
+            disableRow(row);  // Disable current row
+            if (row < 7) enableRow(row + 1);   // Enable next row up
+
+            socket.emit('selectTile', { gameId, userId, tileStep: row, tileIndex: col });
+        }
+
+        // Join game on load or restore state
+        window.onload = () => {
+            socket.emit('joinGame', { gameId, userId });
+        };
+
+        // Handle starting a new game
+        document.getElementById('start-game-btn').addEventListener('click', () => {
+            socket.emit('dragonTowerPlaceBet', { userId, gameId, betAmount: 100, difficulty });
+            document.getElementById('cashout-btn').style.display = 'block';
+        });
+
+        // Listen for game started event
+        socket.on('gameStarted', (data) => {
+            console.log('Game started:', data);
+            createTiles();
+            enableRow(0);  // Enable the bottom row initially
+        });
+
+        // Restore game state on reload
+        // Restore game state on reload
+        socket.on('gameRestored', (data) => {
+            console.log('Restored Game State:', data);
+
+            document.getElementById('wallet-balance').textContent = data.walletBalance || 0;
+            document.getElementById('current-multiplier').textContent = (data.multiplier || 1).toFixed(2);
+
+            // Convert restoreData object to an array
+            const restoreData = Object.values(data.restoreData);
+
+            if (Array.isArray(restoreData)) {
+                // Reset and recreate tiles
+                createTiles();
+
+                // Iterate over the converted restoreData array
+                restoreData.forEach((rowData, row) => {
+                    if (Array.isArray(rowData)) {
+                        rowData.forEach((isSelected, col) => {
+                            const tile = document.querySelector(`.tile[data-row='${row}'][data-col='${col}']`);
+                            if (isSelected) {
+                                tile.classList.add('selected', 'disabled'); // Mark selected and disable
+                            }
+                        });
+                    }
+                });
+
+                // Enable the appropriate row for the next selection if the game is ongoing
+                if (data.currentStep < 8) {
+                    enableRow(data.currentStep);
+                } else {
+                    console.log('Game is either completed or at the final step.');
+                }
+            } else {
+                console.error('Failed to convert restoreData:', data.restoreData);
+                alert('Failed to restore game state. Please try again.');
+            }
+        });
+
+
+        // Handle tile selection result
+        socket.on('tileSelected', (data) => {
+            console.log('Tile selection result:', data);
+            document.querySelector(`.tile[data-row='${data.tileStep}'][data-col='${data.tileIndex}']`)
+                .classList.add('selected');
+            document.getElementById('current-multiplier').textContent = data.multiplier.toFixed(2);
+        });
+
+        // Handle cashout
+        document.getElementById('cashout-btn').addEventListener('click', () => {
+            socket.emit('cashout', { gameId, userId });
+        });
+
+        // Listen for cashout success
+        socket.on('cashoutSuccess', (data) => {
+            alert(`Cashout successful! Final Multiplier: ${data.multiplier}`);
+            createTiles();  // Reset tiles for a new game
+        });
+
+        // Handle game over
+        socket.on('gameOver', (data) => {
+            alert(`Game Over! Final Multiplier: ${data.multiplier}`);
+            createTiles();  // Reset the game
+        });
+
+        // Handle errors
+        socket.on('error', (error) => {
+            console.error('Error:', error);
+            alert(`Error: ${error.message}`);
+        });
+
+        // Initialize the tiles
+        createTiles();
+    </script>
+
+</body>
+
+</html>

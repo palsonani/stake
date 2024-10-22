@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Animated Flame Skull</title>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #2d2d2d;
+            margin: 0;
+        }
+
+        .skull-container {
+            width: 120px;
+            height: 120px;
+            position: relative;
+        }
+
+        .flame {
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at 50% 20%, #ff6680, #d4395b);
+            border-radius: 50%;
+            position: absolute;
+            top: 0;
+            animation: flame-flicker 1.5s infinite ease-in-out, flame-move 3s infinite ease-in-out;
+            transform-origin: center bottom;
+        }
+
+        .skull {
+            width: 60%;
+            height: 60%;
+            background: #fff;
+            border-radius: 50%;
+            position: absolute;
+            top: 40%;
+            left: 20%;
+            box-shadow: inset 2px 2px 5px #333;
+        }
+
+        .skull::before, .skull::after {
+            content: '';
+            position: absolute;
+            background: #333;
+            border-radius: 50%;
+            width: 25%;
+            height: 25%;
+            top: 30%;
+        }
+
+        .skull::before {
+            left: 10%;
+        }
+
+        .skull::after {
+            right: 10%;
+        }
+
+        .mouth {
+            width: 35%;
+            height: 15%;
+            background: #333;
+            position: absolute;
+            bottom: 15%;
+            left: 32%;
+            border-radius: 50%;
+        }
+
+        @keyframes flame-flicker {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05) rotate(2deg); }
+        }
+
+        @keyframes flame-move {
+            0% { transform: translateX(-2px) scaleY(1.02); }
+            50% { transform: translateX(2px) scaleY(0.98); }
+            100% { transform: translateX(-2px) scaleY(1.02); }
+        }
+    </style>
+</head>
+<body>
+    <div class="skull-container">
+        <div class="flame"></div>
+        <div class="skull">
+            <div class="mouth"></div>
+        </div>
+    </div>
+</body>
+</html>
