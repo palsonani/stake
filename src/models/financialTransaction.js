@@ -50,8 +50,8 @@ FinancialTransaction.init({
     }
 }, {
     sequelize,
-    modelName: 'financialTransaction',
-    tableName: 'financialTransaction',
+    modelName: 'financialtransaction',
+    tableName: 'financialtransaction',
     timestamps: false
 });
 

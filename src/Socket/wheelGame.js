@@ -14,16 +14,16 @@ export const wheelSocketHandler = (io) => {
         // Handle manual bet
         socket.on('manualBet', async (betData) => {
             const { betAmount, risk, segment, userId } = betData;
-            console.log(betData);
+            console.log(betData);   
 
             const wallet = await Wallet.findOne({ where: { userId } });
             if (!wallet) {
-                io.to(user.id).emit('WalletNotFound', { message: 'Wallet not found', status: true });
+                io.to(userId).emit('WalletNotFound', { message: 'Wallet not found', status: true });
                 return;
             }
             if (wallet.currentAmount <= betAmount) {
                 console.log('inif', wallet.currentAmount, betAmount);
-                io.to(user.id).emit('Insufficientfund', { message: 'Insufficient funds', status: true });
+                io.to(userId).emit('Insufficientfund', { message: 'Insufficient funds', status: true });
                 return;
             }
 

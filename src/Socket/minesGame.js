@@ -77,12 +77,12 @@ export const minesSocketHandler = (io) => {
             const { userId, gameId, totalMines, betAmount } = data;
             const wallet = await Wallet.findOne({ where: { userId } });
             if (!wallet) {
-                io.to(user.id).emit('WalletNotFound', { message: 'Wallet not found', status: true });
+                io.to(userId).emit('WalletNotFound', { message: 'Wallet not found', status: true });
                 return;
             }
             if (wallet.currentAmount <= betAmount) {
                 console.log('inif', wallet.currentAmount, betAmount);
-                io.to(user.id).emit('Insufficientfund', { message: 'Insufficient funds', status: true });
+                io.to(userId).emit('Insufficientfund', { message: 'Insufficient funds', status: true });
                 return;
             }
             bakendMultiplayer = await getBackendMultiplier(userId, gameId, totalMines)
