@@ -25,8 +25,8 @@ Medal.init({
     }
 }, {
     sequelize,  
-    modelName: 'Medals',
-    tableName: 'Medals',  
+    modelName: 'medals',
+    tableName: 'medals',  
     timestamps: true 
 });
 
