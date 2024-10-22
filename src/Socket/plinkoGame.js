@@ -8,7 +8,7 @@ import { outcomes } from "../methods/gameMethods/plinko/outcomes.js";
 import { rowConfigs } from "../methods/gameMethods/plinko/rowConfigs.js";
 import { generateWeights } from "../methods/gameMethods/plinko/generateWeights.js";
 
-let autoBetSessions = {}; 
+let autoBetSessions = {};
 
 
 export const plinkoSocketHandler = (io) => {
@@ -16,7 +16,7 @@ export const plinkoSocketHandler = (io) => {
         console.log("New user connected for Plinko");
 
         async function placeBet(userId, betAmount, rows, riskLevel) {
-            console.log(userId, betAmount, rows, riskLevel)
+           
             // Validate row configuration and risk level
             if (!rowConfigs[rows]) {
                 return { success: false, error: 'Invalid number of rows' };
@@ -110,8 +110,8 @@ export const plinkoSocketHandler = (io) => {
                 // }
 
                 const winAmount = betAmount * finalMultiplier;
-                console.log("winAmount::", winAmount);
-
+              
+            
                 // Store the bet result in the database
 
                 const bet = await Bet.create({
@@ -138,10 +138,10 @@ export const plinkoSocketHandler = (io) => {
         }
 
         async function emitBetResult(result, socket) {
-            console.log("jfhhg:", result);
+            
             try {
                 result.results.forEach(async (result) => {
-                    console.log("jfhhg:", result);
+                    
 
                     const outcome = result.dropPosition;
 
@@ -170,7 +170,7 @@ export const plinkoSocketHandler = (io) => {
                         });
                     }
                     else {
-                        console.log("result.betId = ", result);
+                        
                         // console.log("results11111.betId = " ,results.betId);
 
 
@@ -275,14 +275,15 @@ export const plinkoSocketHandler = (io) => {
                 // if (wallet.currentAmount < betAmount * autoBetCount) {
                 //     return { success: false, error: 'Insufficient funds' };
                 // }
-
-                const wallet1 = await Wallet.update(
+                let currentAmount= wallet.currentAmount - betAmount;
+               await Wallet.update(
                     { currentAmount: wallet.currentAmount - betAmount },
                     { where: { userId } }
                 );
+                const walletAmount = await Wallet.findOne({ where: { userId } });
 
                 socket.emit("walletBalance", {
-                    walletBalance: wallet1.currentAmount
+                    walletBalance: walletAmount.currentAmount
                 });
 
                 await WalletTransaction.create({
@@ -368,8 +369,8 @@ export const plinkoSocketHandler = (io) => {
 
                 // console.log(`Result: Multiplier=${multiplier}, Position=${dropPosition}, WinAmount=${winAmount}`);
                 // results.push({ finalMultiplier, dropPosition, winAmount });
-                results.push({ finalMultiplier, dropPosition, winAmount, rows, riskLevel, userId, betId: bet.betId });
-                // console.log("results::::", results)
+                results.push({ finalMultiplier, dropPosition, winAmount, rows, riskLevel, userId, betId: bet.id });
+                console.log("results::::::::::::::::::::::", results)
             } catch (error) {
                 console.error('Error saving bet:', error);
                 return { success: false, error: 'Failed to process bet' };
@@ -383,7 +384,7 @@ export const plinkoSocketHandler = (io) => {
             // Get the possible outcomes based on row and risk level
             const possibleOutcomes = rowConfigs[rows][riskLevel];
             console.log('possibleOutcomes:', possibleOutcomes);
-        
+
             // Fetch the user's betting history
             const totalBets = await Bet.findAll({
                 where: { userId, gameId: 9 },
@@ -393,18 +394,18 @@ export const plinkoSocketHandler = (io) => {
                 ],
                 raw: true
             });
-        
+
             const totalBet = totalBets[0]?.totalBet || 0;
             const totalWin = totalBets[0]?.totalWin || 0;
             const netGain = totalWin - totalBet;
             console.log("netGain:", netGain);
-        
+
             // Determine if the user is in profit or loss
             const inProfit = netGain > 0;
-        
+
             // We'll keep the original possible outcomes and generate weights based on them
             let filteredOutcomes = possibleOutcomes;
-        
+
             // If distribution exists and amount is greater than 0, only use first 2 and last element
             if (distribution && distribution.amount > 0 && distribution.status === "active") {
                 const firstTwoElements = possibleOutcomes.slice(0, 2); // First two elements
@@ -412,24 +413,24 @@ export const plinkoSocketHandler = (io) => {
                 filteredOutcomes = [...firstTwoElements, lastElement];
                 console.log("Filtered outcomes for distribution:", filteredOutcomes);
             }
-        
+
             // Generate base weights based on the length of the filtered outcomes
             let baseWeights = generateWeights(filteredOutcomes.length, inProfit, totalBet, netGain);
-        
+
             // Create weighted probabilities based on the filtered outcomes and their adjusted weights
             const weightedProbabilities = [];
-        
+
             filteredOutcomes.forEach((multiplier, index) => {
                 const weight = baseWeights[index];
                 weightedProbabilities.push(...Array(weight).fill({ multiplier, position: index }));
             });
-        
+
             // Randomly select a drop from the weighted probabilities
             const randomIndex = Math.floor(Math.random() * weightedProbabilities.length);
             const selectedOutcome = weightedProbabilities[randomIndex];
             const { multiplier, position } = selectedOutcome;
             console.log("Selected position and multiplier:", position, multiplier);
-        
+
             // Update distribution amount if applicable
             if (distribution && distribution.amount > 0 && distribution.status === "active") {
                 const winAmount = betAmount * multiplier;
@@ -438,16 +439,16 @@ export const plinkoSocketHandler = (io) => {
                     { amount: distribution.amount - profit },
                     { where: { id: distribution.id } }
                 );
-        
+
             } else if (distribution) {
                 // Set distribution to inactive if amount is not sufficient
                 await AmountDistribution.update(
                     { amount: 0, status: 'inactive' },
                     { where: { id: distribution.id } }
                 );
-        
+
             }
-        
+
             // Return the actual drop position and the multiplier
             return { dropPosition: position, multiplier };
         }
@@ -464,9 +465,18 @@ export const plinkoSocketHandler = (io) => {
         socket.on("plinkoPlaceBet", async (data) => {
             const { userId, betAmount, rows, riskLevel, autoBetCount = 1 } = data;
             console.log(data);
-            socket.on('plinkotest', () => {
-                console.log('testing............................');
-            });
+           
+            const wallet = await Wallet.findOne({ where: { userId } });
+            if (!wallet) {
+                io.to(user.id).emit('WalletNotFound', { message: 'Wallet not found', status: true });
+                return;
+            }
+            if (wallet.currentAmount <= betAmount) {
+                console.log('inif', wallet.currentAmount, betAmount);
+                io.to(user.id).emit('Insufficientfund', { message: 'Insufficient funds', status: true });
+                return;
+            }
+
             // Validate rows and risk levels
             if (!rowConfigs[rows] || !rowConfigs[rows][riskLevel]) {
                 console.log("Invalid row or risk level selected");
@@ -525,7 +535,8 @@ export const plinkoSocketHandler = (io) => {
         });
 
         socket.on('betCompleted', async (data) => {
-            console.log("betCompletedbetCompleted")
+console.log("datadatadatadatadata",data);
+
             try {
                 const wallet = await Wallet.findOne({ where: { userId: data.userId } });
                 if (!wallet) {
@@ -566,7 +577,7 @@ export const plinkoSocketHandler = (io) => {
                 socket.emit("walletBalance", {
                     walletBalance: wallet.currentAmount
                 });
-
+                console.log("betCompletedbetCompleted")
             } catch (error) {
                 console.log(error);
 

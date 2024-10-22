@@ -78,7 +78,7 @@
 
     <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
     <script>
-        const socket = io('http://192.168.29.126:3008', { path: '/ws' });
+        const socket = io('http://192.168.29.203:3008', { path: '/ws' });
 
         let gameId = 17;  // Example game ID
         let userId = 2;   // Example user ID
@@ -133,7 +133,7 @@
 
         // Handle starting a new game
         document.getElementById('start-game-btn').addEventListener('click', () => {
-            socket.emit('dragonTowerPlaceBet', { userId, gameId, betAmount: 100, difficulty });
+            socket.emit('dragonTowerPlaceBet', { userId, gameId, betAmount: 100, difficulty,betType: 'manual' });
             document.getElementById('cashout-btn').style.display = 'block';
         });
 
@@ -145,12 +145,11 @@
         });
 
         // Restore game state on reload
-        // Restore game state on reload
         socket.on('gameRestored', (data) => {
             console.log('Restored Game State:', data);
 
             document.getElementById('wallet-balance').textContent = data.walletBalance || 0;
-            document.getElementById('current-multiplier').textContent = (data.multiplier || 1).toFixed(2);
+            document.getElementById('current-multiplier').textContent = (parseFloat(data.multiplier) || 1).toFixed(2);
 
             // Convert restoreData object to an array
             const restoreData = Object.values(data.restoreData);

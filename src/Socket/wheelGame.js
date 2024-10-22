@@ -1,3 +1,5 @@
+import Wallet from "../models/Wallet.js";
+
 export const wheelSocketHandler = (io) => {
     let players = {};
     let bets = [];
@@ -10,9 +12,20 @@ export const wheelSocketHandler = (io) => {
         let autoBetInterval = null;
 
         // Handle manual bet
-        socket.on('manualBet', (betData) => {
-            const { betAmount, risk, segment } = betData;
+        socket.on('manualBet', async (betData) => {
+            const { betAmount, risk, segment, userId } = betData;
             console.log(betData);
+
+            const wallet = await Wallet.findOne({ where: { userId } });
+            if (!wallet) {
+                io.to(user.id).emit('WalletNotFound', { message: 'Wallet not found', status: true });
+                return;
+            }
+            if (wallet.currentAmount <= betAmount) {
+                console.log('inif', wallet.currentAmount, betAmount);
+                io.to(user.id).emit('Insufficientfund', { message: 'Insufficient funds', status: true });
+                return;
+            }
 
             const multiplier = getMultiplier(segment, risk);
             const result = spinWheel(segment, risk); // Spin the wheel and pick a result
@@ -25,9 +38,21 @@ export const wheelSocketHandler = (io) => {
         });
 
         // Handle auto bet logic
-        socket.on('autoBet', (autoBetData) => {
-            let { betAmount, risk, segment, numberOfBets, onWin, onLoss, stopOnLoss, stopOnProfit } = autoBetData;
+        socket.on('autoBet', async (autoBetData) => {
+            let { betAmount, risk, segment, numberOfBets, onWin, onLoss, stopOnLoss, stopOnProfit, userId } = autoBetData;
             console.log("autoBetData", autoBetData)
+
+            const wallet = await Wallet.findOne({ where: { userId } });
+            if (!wallet) {
+                io.to(user.id).emit('WalletNotFound', { message: 'Wallet not found', status: true });
+                return;
+            }
+            if (wallet.currentAmount <= betAmount) {
+                console.log('inif', wallet.currentAmount, betAmount);
+                io.to(user.id).emit('Insufficientfund', { message: 'Insufficient funds', status: true });
+                return;
+            }
+
             let remainingBets = numberOfBets;
             let totalProfit = 0;
             let totalLoss = 0;
@@ -84,6 +109,8 @@ export const wheelSocketHandler = (io) => {
 
     // Helper functions
     function getMultiplier(segment, risk) {
+        console.log(segment, risk);
+
         return rowConfigs[segment][risk];
     }
 
@@ -102,20 +129,30 @@ export const wheelSocketHandler = (io) => {
     }
 
     const rowConfigs = {
-        30: {
+        10: {
             low: [0.00, 1.20, 1.50],
             medium: [0.00, 1.50, 1.90, 2.00, 3.00],
             high: [0.00, 9.90]
         },
-        40: {
+        20: {
             low: [0.00, 1.20, 1.50],
             medium: [0.00, 1.50, 1.80, 2.00, 3.00],
             high: [0.00, 19.80]
         },
-        50: {
+        30: {
             low: [0.00, 1.20, 1.50],
             medium: [0.00, 1.50, 2.00, 3.00, 5.00],
             high: [0.00, 29.70]
+        },
+        40: {
+            low: [0.00, 1.20, 1.50],
+            medium: [0.00, 1.50, 1.60, 2.00, 3.00],
+            high: [0.00, 39.60]
+        },
+        50: {
+            low: [0.00, 1.20, 1.50],
+            medium: [0.00, 1.50, 2.00, 3.00, 5.00],
+            high: [0.00, 49.50]
         }
     };
 };

@@ -30,8 +30,18 @@ export const limboSocketHandler = (io) => {
                     return socket.emit('error', { message: "User not found" });
                 }
 
+                
+                const wallet = await Wallet.findOne({ where: { userId: user.id } });
+                if (!wallet) {
+                    io.to(user.id).emit('WalletNotFound', { message: 'Wallet not found', status: true });
+                    return;
+                }
+                if (wallet.currentAmount <= betAmount) {
+                    console.log('inif',wallet.currentAmount,betAmount);
+                    io.to(user.id).emit('Insufficientfund', { message: 'Insufficient funds', status: true });
+                    return;
+                }
                 console.log(`User ${userId} found. Processing bet type: ${betType}`);
-
                 if (betType === 'Manual') {
                     await handleManualBet(user, betAmount, multiplier, socket);
                 } else if (betType === 'Auto') {
@@ -69,15 +79,6 @@ export const limboSocketHandler = (io) => {
             const { isWin, winAmount, actualMultiplier } = result;
     
             const wallet = await Wallet.findOne({ where: { userId: user.id } });
-            if (!wallet) {
-                io.to(user.id).emit('WalletNotFound', { message: 'Wallet not found', status: true });
-                return;
-            }
-    
-            if (wallet.currentAmount < betAmount) {
-                io.to(user.id).emit('Insufficientfund', { message: 'Insufficient funds', status: true });
-                return;
-            }
     
             await Wallet.update(
                 { currentAmount: wallet.currentAmount - betAmount },

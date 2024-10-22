@@ -956,8 +956,7 @@ export const getGameHistory = async (req, res) => {
             ],
             include: [{
                 model: PullPlayer,
-                attributes: [], // No attributes needed from PullPlayer for this query
-                required: true
+                attributes: []
             }],
             group: ['Pull.id'], // Group by Pull ID to aggregate the data
             having: havingConditions, // Apply the having conditions for totalAmount and playerCount
@@ -1010,8 +1009,7 @@ export const getGameHistory = async (req, res) => {
             ],
             include: [{
                 model: PullPlayer,
-                attributes: [],
-                required: true
+                attributes: []
             }],
             group: ['Pull.id'],
             having: havingConditions,

@@ -87,7 +87,7 @@ export const crashSocketHandler = (io) => {
                             const wallet = await Wallet.findOne({ where: { userId } });
                             if (!wallet) throw new Error('Wallet not found');
         
-                            if (wallet.currentAmount < amount) {
+                            if (wallet.currentAmount <= amount) {
                                 io.to(userId).emit('Insufficientfund', {
                                     message: 'Insufficient funds',
                                     status: true
@@ -321,7 +321,7 @@ export const crashSocketHandler = (io) => {
         
                 // Check if the user has enough balance
                 const totalBetCost = amount * numberOfBets;
-                if (wallet.currentAmount < totalBetCost) {
+                if (wallet.currentAmount <= totalBetCost) {
                     io.to(userId).emit('Insufficientfund', { message: 'Insufficient funds for auto bets', status: true });
                     console.log("Insufficient funds for auto bets");
                     return;
@@ -716,8 +716,8 @@ export const crashSocketHandler = (io) => {
                 // No players, set crash point randomly between 1.01 and 5
                 const minCrashPoint = 1.01;
                 const maxCrashPoint = 5;
-                // crashPoint = parseFloat((Math.random() * (maxCrashPoint - minCrashPoint) + minCrashPoint).toFixed(2));
-                crashPoint = 5;
+                crashPoint = parseFloat((Math.random() * (maxCrashPoint - minCrashPoint) + minCrashPoint).toFixed(2));
+                // crashPoint = 5;
             } else if (players.length === 1 && autoBets.length === 0 || players.length === 0 && autoBets.length === 1) {
                 // Only one player or auto bet, set crash point to a random value between 1.01 and their cashout multiplier
                 const onlyPlayer = players.length === 1 ? players[0] : autoBets[0];

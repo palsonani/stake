@@ -34,8 +34,6 @@ export const dragonTowerSocketHandler = (io) => {
                 }
             });
 
-            console.log("active bet ==", activeBet)
-
             if (activeBet) {
                 betId = activeBet.id; // Store the active bet ID
                 console.log('Active bet found for user:', data.userId, betId);
@@ -64,12 +62,22 @@ export const dragonTowerSocketHandler = (io) => {
             if (!wallet) {
                 return { success: false, error: 'Wallet not found' };
             }
+
+            if (!wallet) {
+                io.to(user.id).emit('WalletNotFound', { message: 'Wallet not found', status: true });
+                return;
+            }
+            if (wallet.currentAmount <= betAmount) {
+                console.log('inif', wallet.currentAmount, betAmount);
+                io.to(user.id).emit('Insufficientfund', { message: 'Insufficient funds', status: true });
+                return;
+            }
+
             // Create a new bet record
             const bet = await Bet.create({ gameId, userId, difficulty, betAmount, betType, multiplier });
             betId = bet.id;
             stage = difficulty
 
-            console.log("betid:::::::::::", betId, bet.id, bet);
             await DragonTowerLocation.create({
                 gameId,
                 userId,
@@ -204,7 +212,7 @@ export const dragonTowerSocketHandler = (io) => {
                 })
                 socket.emit('cashoutSuccess', { multiplier: currentMultiplier });
                 socket.emit('walletBalance', walletData.currentAmount);
-                
+
             } catch (error) {
                 console.error('Error during cashout:', error.message);
                 socket.emit('error', { message: 'Cashout failed. Please try again.' });
@@ -227,7 +235,8 @@ export const dragonTowerSocketHandler = (io) => {
                 console.error('Bet not found for user:', userId);
                 throw new Error('No active bet found');
             }
-            difficulty = Bet.difficulty;
+
+            stage = bet.difficulty;
             // Fetch mine locations associated with the bet
             const data = await DragonTowerLocation.findOne({ where: { gameId, userId, betId } });
             console.log("data ===", data)

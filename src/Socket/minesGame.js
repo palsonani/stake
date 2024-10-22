@@ -75,19 +75,22 @@ export const minesSocketHandler = (io) => {
             console.log('Start game request received:', data);
             step = 0;
             const { userId, gameId, totalMines, betAmount } = data;
-            
+            const wallet = await Wallet.findOne({ where: { userId } });
+            if (!wallet) {
+                io.to(user.id).emit('WalletNotFound', { message: 'Wallet not found', status: true });
+                return;
+            }
+            if (wallet.currentAmount <= betAmount) {
+                console.log('inif', wallet.currentAmount, betAmount);
+                io.to(user.id).emit('Insufficientfund', { message: 'Insufficient funds', status: true });
+                return;
+            }
             bakendMultiplayer = await getBackendMultiplier(userId, gameId, totalMines)
             // Create a new bet record
-            const bet = await Bet.create({ gameId, userId, mines: totalMines, multiplier: bakendMultiplayer, betType: 'manual',betAmount });
+            const bet = await Bet.create({ gameId, userId, mines: totalMines, multiplier: bakendMultiplayer, betType: 'manual', betAmount });
             try {
                 const wallet = await Wallet.findOne({ where: { userId } });
-                if (!wallet) {
-                    return { success: false, error: 'Wallet not found' };
-                }
-                if (wallet.currentAmount < betAmount) {
-                    io.to(userId).emit('Insufficientfund', { message: 'Insufficient funds', status: true });
-                    return;
-                }
+
                 await Wallet.update(
                     { currentAmount: wallet.currentAmount - betAmount },
                     { where: { userId } }
@@ -200,7 +203,7 @@ export const minesSocketHandler = (io) => {
                 }
 
                 console.log('User cashed out successfully:', { userId, currentMultiplier });
-                socket.emit('cashoutSuccess', { multiplier: currentMultiplier,totalSelectedTiles:gameState.totalSelectedTiles });
+                socket.emit('cashoutSuccess', { multiplier: currentMultiplier, totalSelectedTiles: gameState.totalSelectedTiles });
 
                 const wallet = await Wallet.findOne({ where: { userId } });
 
@@ -520,7 +523,7 @@ export const minesSocketHandler = (io) => {
         return {
             betId: bet.id,
             mines: bet.mines,
-            betAmount:bet.betAmount,
+            betAmount: bet.betAmount,
             mineLocations: mineLocations.map(tile => ({
                 tileIndex: tile.tileIndex,
                 isMine: tile.isMine,
