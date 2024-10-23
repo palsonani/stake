@@ -46,31 +46,6 @@ export const minesSocketHandler = (io) => {
         let bakendMultiplier;
         let step = 0;
 
-        // socket.on('checkActiveBet', async (data) => {
-        //     const { userId, gameId } = data;
-
-        //     // Check if there is an active bet for the user and game
-        //     const activeBet = await Bet.findOne({
-        //         where: {
-        //             userId,
-        //             gameId,
-        //             isActive: true // Ensure the bet is active
-        //         }
-        //     });
-
-        //     if (activeBet) {
-        //         betId = activeBet.id; // Store the active bet ID
-        //         console.log('Active bet found for user:', userId, betId);
-
-        //         // Restore game state
-        //         const gameState = await restoreGameState(gameId, userId, betId);
-        //         socket.emit('gameRestored', gameState);
-        //         console.log('Game restored for user:', userId, gameState);
-        //     } else {
-        //         console.log('No active bet found for user:', userId);
-        //     }
-        // });
-
         socket.on('minePlaceBet', async (data) => {
             console.log('Start game request received:', data);
             step = 0;
@@ -173,16 +148,6 @@ export const minesSocketHandler = (io) => {
             }
         });
 
-        // socket.on('restoreGame', async (data) => {
-        //     console.log('Restore game request received:', data);
-        //     const { gameId, userId } = data;
-
-        //     // Restore game state
-        //     const gameState = await restoreGameState(gameId, userId, betId);
-        //     socket.emit('gameRestored', gameState);
-        //     console.log('Game restored for user:', userId, gameState);
-        // });
-
         socket.on('cashout', async (data) => {
             const { gameId, userId } = data;
 
@@ -250,9 +215,6 @@ export const minesSocketHandler = (io) => {
     });
 
     async function selectTile(gameId, userId, tileIndex, betId, step, bakendMultiplier) {
-        // console.log('New bet created::::::::::::::::::::::::::::::::::::::', betId);
-        // console.log('Selecting tile:', { gameId, userId, tileIndex, betId });
-
         const bet = await Bet.findOne({
             where: {
                 id: betId,

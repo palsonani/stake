@@ -1140,72 +1140,7 @@ export const crashSocketHandler = (io) => {
                 }, 2000); // 2 seconds before the game starts
             }, 10000); // 10-second betting period
         };
-
-        // const startNewGame = () => {
-        //     if (isGameRunning) return;
-
-        //     console.log('Starting new game...');
-        //     // Reset game state
-        //     gameMultiplier = 1.0;
-        //     isGameRunning = true;
-        //     gameStartTimestamp = Date.now();
-        //     countdownStarted = true;
-
-        //     // Reset players and total bet amount
-        //     // players = [];
-
-        //     totalBetAmount = 0;
-
-        //     // Emit message to notify about the start of the betting period
-        //     io.emit('bettingStarted', { message: 'Betting period has started. Place your bets!', status: true });
-
-
-        //     // Emit message to notify about the start of the betting period
-        //     io.emit('bettingStarted', { message: 'Betting period has started. Place your bets!', status: true });
-        //     // Start betting period
-        //     betInterval = setTimeout(() => {
-        //         countdownStarted = false;
-        //         calculateCrashPoint();
-        //         io.emit('bettingClosed', { message: 'Betting period has ended. Game starting soon...', status: false });
-
-        //         // Delay to start the game after calculating crash point
-        //         setTimeout(() => {
-        //             io.emit('gameStarted', { multiplier: gameMultiplier.toFixed(1) });
-        //             io.emit('multiplierUpdate', { multiplier: gameMultiplier.toFixed(1) });
-        //             // Start game loop
-        //             gameInterval = setInterval(() => {
-
-        //                 if (isGameRunning) {
-        //                     // gameMultiplier = parseFloat((gameMultiplier + 0.1).toFixed(2));
-        //                     // io.emit('multiplierUpdate', { multiplier: gameMultiplier });
-
-        //                     // if (gameMultiplier >= crashPoint) {
-        //                     //     clearInterval(gameInterval);
-        //                     //     isGameRunning = false;
-        //                     //     endGameRound();
-        //                     // }
-
-        //                     const nextMultiplier = parseFloat((gameMultiplier + 0.10).toFixed(3));
-
-        //                     if (nextMultiplier >= crashPoint) {
-        //                         // Set gameMultiplier to crashPoint if the next increment would exceed it
-        //                         gameMultiplier = crashPoint;
-        //                         io.emit('multiplierUpdate', { multiplier: gameMultiplier });
-        //                         clearInterval(gameInterval);
-        //                         isGameRunning = false;
-        //                         endGameRound();
-        //                     } else {
-        //                         // Increment gameMultiplier and limit to 2 decimal places
-        //                         gameMultiplier = nextMultiplier;
-        //                         // Notify clients of the updated multiplier
-        //                         io.emit('multiplierUpdate', { multiplier: gameMultiplier.toFixed(1) });
-        //                     }
-        //                 }
-        //             }, 500);
-        //         }, 2000); // 2 seconds before the game starts
-        //     }, 10000); // 10-second betting period
-        // };
-        
+   
         startNewGame()
     });
 

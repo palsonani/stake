@@ -586,35 +586,3 @@ export const plinkoSocketHandler = (io) => {
     });
 
 };
-
-// Emit the result of a bet
-// async function emitBetResult(result, socket) {
-//     console.log("jfhhg:",result)
-//     result.results.forEach((result) => {
-//         console.log("jfhhg:",result)
-//         const outcome = result.dropPosition;
-//         const multiplier = rowConfigs[result.rows][result.riskLevel][outcome];
-//         const possibleOutcomes = outcomes[result.rows][outcome];
-
-//         const pattern = [];
-//         for (let i = 0; i < result.rows; i++) {
-//             pattern.push(Math.random() > 0.5 ? "R" : "L");
-//         }
-
-//         socket.emit("plinkoBetResult", {
-//             point: possibleOutcomes[Math.floor(Math.random() * possibleOutcomes.length)],
-//             multiplier,
-//             pattern,
-//         });
-
-//         const lastBets =  Bet.findAll({
-//             where: { userId:result.userId, gameId: 9 },
-//             order: [['betTime', 'DESC']],
-//             limit: 4
-//         });
-
-//         const lastMultipliers = lastBets.map(bet => bet.multiplier);
-//         console.log(lastMultipliers);
-//         socket.emit('lastFourMultipliers', { multipliers: lastMultipliers });
-//     });
-// }
