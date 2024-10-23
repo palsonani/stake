@@ -148,7 +148,7 @@ export const minesSocketHandler = (io) => {
             try {
                 console.log("select tiles bet::", betId);
 
-                const result = await selectTile(gameId, userId, tileIndex, betId, step, bakendMultiplayer);
+                const result = await selectTile(gameId, userId, tileIndex, betId, step, bakendMultiplier);
                 console.log("lkjsdbgfjhsd", result);
 
                 step++;
@@ -249,7 +249,7 @@ export const minesSocketHandler = (io) => {
 
     });
 
-    async function selectTile(gameId, userId, tileIndex, betId, step, bakendMultiplayer) {
+    async function selectTile(gameId, userId, tileIndex, betId, step, bakendMultiplier) {
         // console.log('New bet created::::::::::::::::::::::::::::::::::::::', betId);
         // console.log('Selecting tile:', { gameId, userId, tileIndex, betId });
 
@@ -282,17 +282,17 @@ export const minesSocketHandler = (io) => {
         // Calculate the current multiplier
         const currentMultiplier = baseIncrement;
         console.log('Current multiplier:', currentMultiplier);
-        let finalbakendMultiplayer
+        let finalbakendMultiplier
         if (bet.multiplier) {
-            finalbakendMultiplayer = bet.multiplier
+            finalbakendMultiplier = bet.multiplier
         }
         else {
-            finalbakendMultiplayer = bakendMultiplayer
+            finalbakendMultiplier = bakendMultiplier
         }
-        console.log("bakendMultiplayerbakendMultiplayer::", finalbakendMultiplayer);
+        console.log("bakendMultiplayerbakendMultiplayer::", finalbakendMultiplier);
 
         // Check if the current multiplier has reached the threshold to set the next mine
-        if (finalbakendMultiplayer <= currentMultiplier) {
+        if (finalbakendMultiplier <= currentMultiplier) {
             console.log('Setting next tile as mine for user:', userId);
             // Set the next tile as a mine
             await setNextTileAsMine(gameId, userId, tileIndex, bet.id); // Pass betId

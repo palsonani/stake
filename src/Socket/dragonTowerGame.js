@@ -15,37 +15,42 @@ export const dragonTowerSocketHandler = (io) => {
         let stage;
         let step;
         let currentMultiplier;
-        let multiplier = 9.79;
+        let multiplier;
 
         socket.on('joinGame', async (data) => {
             const roomName = `game_${data.gameId}`;
             socket.join(roomName);
             console.log('User joined room:', roomName);
-            console.log('Updated rooms:', io.sockets.adapter.rooms);
-
-            if (!data.gameId && !data.userId) {
-                throw new Error('Enter userId and gameId');
-            }
-            const activeBet = await Bet.findOne({
-                where: {
-                    userId: data.userId,
-                    gameId: data.gameId,
-                    isActive: true // Check for an active bet
+            console.log('Updated rooms:', io?.sockets?.adapter?.rooms);
+            try {
+                if (!data.gameId && !data.userId) {
+                    throw new Error('Enter userId and gameId');
                 }
-            });
+                const activeBet = await Bet.findOne({
+                    where: {
+                        userId: data.userId,
+                        gameId: data.gameId,
+                        isActive: true // Check for an active bet
+                    }
+                });
 
-            if (activeBet) {
-                betId = activeBet.id; // Store the active bet ID
-                console.log('Active bet found for user:', data.userId, betId);
+                if (activeBet) {
+                    betId = activeBet.id; // Store the active bet ID
+                    console.log('Active bet found for user:', data.userId, betId);
 
-                // Restore game state
-                const gameState = await restoreGameState(data.gameId, data.userId, betId);
-                selectedTileObj = gameState.restoreData;
-                step = gameState.currentStep;
-                const currentMultiplier = calculateIncrement(activeBet.difficulty, step);
-                socket.emit('gameRestored', gameState, currentMultiplier);
-                console.log('Game restored for user:', data.userId, gameState);
-                return;
+                    // Restore game state
+                    const gameState = await restoreGameState(data.gameId, data.userId, betId);
+                    selectedTileObj = gameState.restoreData;
+                    step = gameState.currentStep;
+                    multiplier = gameState.multiplier;
+                    const currentMultiplier = calculateIncrement(activeBet.difficulty, step);
+                    socket.emit('gameRestored', gameState, currentMultiplier);
+                    console.log('Game restored for user:', data.userId, gameState);
+                    return;
+                }
+            } catch (error) {
+                console.log(error)
+                socket.emit('error', { message: error.message });
             }
         });
 
@@ -57,70 +62,76 @@ export const dragonTowerSocketHandler = (io) => {
             stage = '';
 
             const { userId, gameId, betAmount, difficulty, betType } = data;
-
-            const wallet = await Wallet.findOne({ where: { userId } });
-            if (!wallet) {
-                return { success: false, error: 'Wallet not found' };
-            }
-
-            if (!wallet) {
-                io.to(user.id).emit('WalletNotFound', { message: 'Wallet not found', status: true });
-                return;
-            }
-            if (wallet.currentAmount <= betAmount) {
-                console.log('inif', wallet.currentAmount, betAmount);
-                io.to(user.id).emit('Insufficientfund', { message: 'Insufficient funds', status: true });
-                return;
-            }
-
-            // Create a new bet record
-            const bet = await Bet.create({ gameId, userId, difficulty, betAmount, betType, multiplier });
-            betId = bet.id;
-            stage = difficulty
-
-            await DragonTowerLocation.create({
-                gameId,
-                userId,
-                betId: bet.id,
-                selectedTile: JSON.stringify(selectedTileObj),
-                currentMultiplier
-            })
-
-            await Wallet.update(
-                { currentAmount: wallet.currentAmount - betAmount },
-                { where: { userId } }
-            );
-
-            await WalletTransaction.create({
-                walletId: wallet.id,
-                userId,
-                amount: betAmount,
-                transactionType: 'bet',
-                transactionDirection: 'debit',
-                description: `Placed  bets of ${betAmount} each`,
-                transactionTime: new Date()
-            });
-
-            await FinancialTransaction.create({
-                gameId,
-                walletId: wallet.id,
-                userId,
-                amount: betAmount,
-                transactionType: 'bet',
-                transactionDirection: 'credit',
-                description: `Placed  bets of ${betAmount} each`,
-                transactionTime: new Date()
-            });
-
-            const walletData = await Wallet.findOne({
-                where: {
-                    userId
+            try {
+                const wallet = await Wallet.findOne({ where: { userId } });
+                if (!wallet) {
+                    return { success: false, error: 'Wallet not found' };
                 }
-            })
 
-            socket.emit('walletBalance', walletData.currentAmount)
-            socket.emit('gameStarted', { gameId, betId: bet.id });
-            console.log('Game started and emitted:', { gameId, betId: bet.id });
+                if (!wallet) {
+                    io.to(user.id).emit('WalletNotFound', { message: 'Wallet not found', status: true });
+                    return;
+                }
+                if (wallet.currentAmount <= betAmount) {
+                    console.log('inif', wallet.currentAmount, betAmount);
+                    io.to(user.id).emit('Insufficientfund', { message: 'Insufficient funds', status: true });
+                    return;
+                }
+
+                multiplier = await calculateAdaptiveMultiplier(userId, difficulty, gameId);
+
+                // Create a new bet record
+                const bet = await Bet.create({ gameId, userId, difficulty, betAmount, betType, multiplier });
+                betId = bet.id;
+                stage = difficulty
+
+                await DragonTowerLocation.create({
+                    gameId,
+                    userId,
+                    betId: bet.id,
+                    selectedTile: JSON.stringify(selectedTileObj),
+                    currentMultiplier
+                })
+
+                await Wallet.update(
+                    { currentAmount: wallet.currentAmount - betAmount },
+                    { where: { userId } }
+                );
+
+                await WalletTransaction.create({
+                    walletId: wallet.id,
+                    userId,
+                    amount: betAmount,
+                    transactionType: 'bet',
+                    transactionDirection: 'debit',
+                    description: `Placed  bets of ${betAmount} each`,
+                    transactionTime: new Date()
+                });
+
+                await FinancialTransaction.create({
+                    gameId,
+                    walletId: wallet.id,
+                    userId,
+                    amount: betAmount,
+                    transactionType: 'bet',
+                    transactionDirection: 'credit',
+                    description: `Placed  bets of ${betAmount} each`,
+                    transactionTime: new Date()
+                });
+
+                const walletData = await Wallet.findOne({
+                    where: {
+                        userId
+                    }
+                })
+
+                socket.emit('walletBalance', walletData.currentAmount)
+                socket.emit('gameStarted', { gameId, betId: bet.id });
+                console.log('Game started and emitted:', { gameId, betId: bet.id });
+            } catch (error) {
+                console.log(error)
+                socket.emit('error', { message: error.message });
+            }
         });
 
         socket.on('selectTile', async (data) => {
@@ -259,6 +270,40 @@ export const dragonTowerSocketHandler = (io) => {
             }
         }
 
+        async function calculateAdaptiveMultiplier(userId, difficulty, gameId) {
+            // Get the user's last 15 bets for the Dragon Tower game
+            const lastBets = await Bet.findAll({
+                where: { userId, gameId },
+                order: [['betTime', 'DESC']],
+                limit: 15
+            });
+
+            // Calculate total win and loss amounts
+            const { totalWins, totalLosses } = lastBets.reduce(
+                (acc, bet) => {
+                    if (bet.status === 'win') {
+                        acc.totalWins += bet.winAmount;
+                    } else {
+                        acc.totalLosses += bet.betAmount;
+                    }
+                    return acc;
+                },
+                { totalWins: 0, totalLosses: 0 }
+            );
+
+            // Determine whether the user is in profit or loss
+            const inProfit = totalWins > totalLosses;
+
+            // Select the appropriate multiplier index
+            let newStep = inProfit ? Math.max(0, step - 1) : Math.min(step + 1, rawConfigs[difficulty].length - 1);
+
+            console.log(`Adaptive step selected: ${newStep} for difficulty: ${difficulty}`);
+
+            // Return the adaptive multiplier
+            return rawConfigs[difficulty][newStep];
+        }
+
+
         async function selectTile(gameId, userId, tileStep, tileIndex, betId, step) {
             const arr = new Array(...arrayConfig[stage]);
             console.log("entrance array ===", arr)
@@ -283,6 +328,7 @@ export const dragonTowerSocketHandler = (io) => {
             const baseIncrement = calculateIncrement(bet.difficulty, step)
             currentMultiplier = baseIncrement;
             console.log('Current multiplier:', currentMultiplier);
+
 
             // Check if the current multiplier has reached the threshold to set the next mine
             if (multiplier <= currentMultiplier) {

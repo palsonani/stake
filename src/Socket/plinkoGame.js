@@ -535,8 +535,6 @@ export const plinkoSocketHandler = (io) => {
         });
 
         socket.on('betCompleted', async (data) => {
-console.log("datadatadatadatadata",data);
-
             try {
                 const wallet = await Wallet.findOne({ where: { userId: data.userId } });
                 if (!wallet) {

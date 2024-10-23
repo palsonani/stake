@@ -11,6 +11,7 @@ export const limboSocketHandler = (io) => {
         console.log('New user connected for Limbo game',socket.id);
         io.emit('limboConnection', { message: 'new limboConnection' });
         let roomName;
+
         socket.on('joinGame', (gameId) => {
             const roomName = `game_${gameId.gameId}`;
             socket.join(roomName);
@@ -53,12 +54,14 @@ export const limboSocketHandler = (io) => {
             }
         });
 
-        socket.on('stopAutoBet', (userId) => {
-            if (activeAutoBets[userId]) {
-                activeAutoBets[userId] = false; // Mark the user's auto bet as stopped
-                console.log(`Auto-bet stopped for user ${userId}`);
+        socket.on('stopAutoBet', (data) => {
+            console.log("kjnbahsdkfjnhbsdkrftgnh",activeAutoBets[data.userId],data.userId)
+            if (activeAutoBets[data.userId]) {
+                activeAutoBets[data.userId] = false; // Mark the user's auto bet as stopped
+                console.log(`Auto-bet stopped for user ${data.userId}`);
                 socket.emit('autoBetStopped', { message: "Auto-bet has been stopped." });
             } else {
+                console.log("jkhbvjvanhsdbj")
                 socket.emit('error', { message: "No active auto-bet found." });
             }
         });
@@ -68,6 +71,55 @@ export const limboSocketHandler = (io) => {
             if (roomName) {
                 socket.leave(roomName);
             }
+        });
+
+        socket.on('betCompleted', async (data) => {
+            try {
+                const wallet = await Wallet.findOne({ where: { userId: data.userId } });
+                if (!wallet) {
+                    return { success: false, error: 'Wallet not found' };
+                }
+                const bet = await Bet.findByPk(data.betId);
+
+                await Bet.update(
+                    { isActive: false },
+                    { where: { id: data.betId } }
+                );
+
+                await Wallet.update(
+                    { currentAmount: wallet.currentAmount + bet.winAmount },
+                    { where: { userId: data.userId } }
+                );
+
+                await WalletTransaction.create({
+                    walletId: wallet.id,
+                    userId: data.userId,
+                    amount: bet.winAmount,
+                    transactionType: 'win',
+                    transactionDirection: 'credit',
+                    description: `Won amount ${bet.winAmount}`,
+                    transactionTime: new Date(),
+                });
+
+                await FinancialTransaction.create({
+                    gameId: 9,
+                    walletId: wallet.id,
+                    userId: data.userId,
+                    amount: bet.winAmount,
+                    transactionType: 'win',
+                    transactionDirection: 'debit',
+                    description: `Won amount ${bet.winAmount}`,
+                    transactionTime: new Date(),
+                });
+                socket.emit("walletBalance", {
+                    walletBalance: wallet.currentAmount
+                });
+                console.log("betCompletedbetCompleted")
+            } catch (error) {
+                console.log(error);
+
+            }
+
         });
     });
 
@@ -118,32 +170,6 @@ export const limboSocketHandler = (io) => {
                 betTime: new Date(),
             });
     
-            await Wallet.update(
-                { currentAmount: wallet.currentAmount + winAmount },
-                { where: { userId: user.id } }
-            );
-    
-            await WalletTransaction.create({
-                walletId: wallet.id,
-                userId: user.id,
-                amount: winAmount,
-                transactionType: 'win',
-                transactionDirection: 'credit',
-                description: `Won amount ${winAmount}`,
-                transactionTime: new Date(),
-            });
-    
-            await FinancialTransaction.create({
-                gameId: 14,
-                walletId: wallet.id,
-                userId: user.id,
-                amount: winAmount,
-                transactionType: 'win',
-                transactionDirection: 'debit',
-                description: `Won amount ${winAmount}`,
-                transactionTime: new Date(),
-            });
-    
             io.to(user.id).emit('limbobetResult', {
                 isWin,
                 actualMultiplier,
@@ -171,9 +197,9 @@ export const limboSocketHandler = (io) => {
         try {
             let currentBetAmount = initialBetAmount;
             let totalProfit = 0;
-    
+            let uId = user.id
             console.log(`Starting auto-bet for user ${user.id}, Initial Bet Amount: ${initialBetAmount}, Auto Bet Count: ${autoBetCount}`);
-            activeAutoBets[user.id] = true;
+            activeAutoBets[uId] = true;  
     
             for (let i = 0; i < autoBetCount; i++) {
                 if (!activeAutoBets[user.id]) {
@@ -182,6 +208,7 @@ export const limboSocketHandler = (io) => {
                 }
     
                 console.log(`Auto-bet round ${i + 1} for user ${user.id}`);
+                console.log("kjnbahsdkfjnhbsdkrftgnh:::::::::::::::::",activeAutoBets[uId],user.id)
                 const result = await simulateWinLoss(user.id, selectedMultiplier, currentBetAmount);
                 const { isWin, winAmount, actualMultiplier } = result;
     
