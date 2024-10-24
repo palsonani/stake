@@ -9,6 +9,7 @@ import { plinkoSocketHandler } from '../Socket/plinkoGame.js';
 import allowedOrigins from './allowedOrigins.js';
 import { wheelSocketHandler } from '../Socket/wheelGame.js';
 import { dragonTowerSocketHandler } from '../Socket/dragonTowerGame.js';
+import { testSocketHandler } from '../Socket/test.js';
 
 dotenv.config()
 
@@ -22,6 +23,7 @@ export function setupSockets(app) {
     const wheelServer = http.createServer(app);
     const limboServer = http.createServer(app);
     const dragonTowerServer = http.createServer(app);
+    const testingServer = http.createServer(app);
 
     // Utility function to create socket servers
     function createSocketServer(serverInstance, path, allowedOrigins) {
@@ -42,6 +44,7 @@ export function setupSockets(app) {
     const wheelIo = createSocketServer(wheelServer, '/ws', allowedOrigins);
     const limboIo = createSocketServer(limboServer, '/ws', allowedOrigins);
     const dragonTowerIo = createSocketServer(dragonTowerServer, '/ws', allowedOrigins);
+    const testIo = createSocketServer(testingServer, '/ws', allowedOrigins);
 
     // Setup handlers for each socket server
     chatSocketHandler(chatIo)
@@ -50,6 +53,7 @@ export function setupSockets(app) {
     minesSocketHandler(mineIo);
     limboSocketHandler(limboIo)
     wheelSocketHandler(wheelIo)
+    testSocketHandler(testIo)
     dragonTowerSocketHandler(dragonTowerIo)
 
     return {
@@ -60,6 +64,7 @@ export function setupSockets(app) {
         wheelServer,
         limboServer,
         dragonTowerServer,
+        testingServer,
         chatIo,
         crashIo,
         plinkoIo,
@@ -77,7 +82,8 @@ export function startServers({
     mineServer,
     wheelServer,
     limboServer,
-    dragonTowerServer
+    dragonTowerServer,
+    testingServer
 }) {
 
     const serverConfig = [
@@ -88,6 +94,7 @@ export function startServers({
         { server: wheelServer, port: process.env.WHEELPORT, name: 'Wheel game server' },
         { server: limboServer, port: process.env.LIMBOPORT, name: 'Limbo game server' },
         { server: dragonTowerServer, port: process.env.DRAGONTOWERPORT, name: 'Dragon Tower game server' },
+        { server: testingServer, port: 3009, name: 'Testing server' }
     ];
 
     // Start each server

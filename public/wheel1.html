@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wheel Game</title>
+    <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            background-color: #f5f5f5;
+            font-family: Arial, sans-serif;
+        }
+
+        #wheel-container {
+            position: relative;
+            width: 300px;
+            height: 300px;
+            border-radius: 50%;
+            overflow: hidden;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.3);
+        }
+
+        .wheel-segment {
+            position: absolute;
+            width: 50%;
+            height: 300px;
+            top: 0;
+            left: 50%;
+            transform-origin: left center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: black;
+            /* Color for the index text */
+            font-size: 24px;
+            border-right: 2px solid black;
+            /* Black line between segments */
+        }
+
+        /* Remove last border for the last segment */
+        .wheel-segment:last-child {
+            border-right: none;
+        }
+
+        #spin-button {
+            margin-top: 20px;
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        #spin-button:disabled {
+            background-color: #888;
+            cursor: not-allowed;
+        }
+
+        #bet-controls {
+            margin-top: 10px;
+        }
+
+        /* Arrow styles */
+        .arrow {
+            position: absolute;
+            top: -30px;
+            /* Position the arrow above the wheel */
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 10px solid transparent;
+            border-right: 10px solid transparent;
+            border-bottom: 20px solid red;
+            /* Arrow color */
+        }
+
+        /* Highlighting winning segment */
+        .winning-segment {
+            background-color: rgba(255, 223, 186, 0.6);
+            /* Light highlight color */
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="wheel-container" id="wheel">
+        <div class="arrow"></div> <!-- Arrow added here -->
+    </div>
+
+    <button id="create-segments">Create Segments</button>
+    <button id="spin-button" style="display: none;">Spin Wheel</button>
+
+    <div id="bet-controls" style="display: none;">
+        <input type="number" id="bet-amount" placeholder="Enter bet amount">
+        <select id="risk-level">
+            <option value="low">Low</option>
+            <option value="medium">Medium</option>
+            <option value="high">High</option>
+        </select>
+        <button id="place-manual-bet">Place Manual Bet</button>
+    </div>
+
+    <input type="number" id="segment-number" placeholder="Enter number of segments">
+
+    <script>
+        const socket = io('http://192.168.29.203:3009', { path: '/ws' });
+
+        const spinButton = document.getElementById("spin-button");
+        const betAmountInput = document.getElementById("bet-amount");
+        const riskLevelSelect = document.getElementById("risk-level");
+        const segmentInput = document.getElementById("segment-number");
+        const wheel = document.getElementById("wheel-container");
+
+        // Function to create the wheel segments
+        function createSegments(segmentCount) {
+            wheel.innerHTML = ""; // Clear existing segments
+
+            for (let i = 0; i < segmentCount; i++) {
+                const segment = document.createElement("div");
+                segment.className = "wheel-segment";
+                segment.style.transform = `rotate(${(360 / segmentCount) * i}deg)`;
+                segment.innerText = i; // Display segment index
+                wheel.appendChild(segment);
+            }
+
+            spinButton.style.display = 'block'; // Show the spin button
+            document.getElementById("bet-controls").style.display = 'block'; // Show bet controls
+        }
+
+        // Create segments when the button is clicked
+        document.getElementById("create-segments").addEventListener("click", () => {
+            const segmentCount = parseInt(segmentInput.value);
+            if (segmentCount > 0) {
+                createSegments(segmentCount); // Create segments based on user input
+            } else {
+                alert("Please enter a valid number of segments.");
+            }
+        });
+
+        // Handle manual bet placement
+        document.getElementById("place-manual-bet").addEventListener("click", () => {
+            const betAmount = parseFloat(betAmountInput.value);
+            const risk = riskLevelSelect.value;
+            const userId = "2"; // Example user ID
+
+            const betData = { betAmount, risk, userId, segment: parseInt(segmentInput.value) };
+            console.log("Placing manual bet:", betData);
+
+            socket.emit("manualBet", betData);
+        });
+
+        // Listen for manual bet result
+        socket.on("manualBetResult", (outcome) => {
+            console.log("Manual Bet Outcome:", outcome);
+            alert(`Bet Outcome: Position - ${outcome.position}, Multiplier - ${outcome.multiplier}, Is Profit - ${outcome.inProfit}`);
+            spinWheel(outcome.position);  // Spin the wheel to the winning segment
+        });
+
+        // Spin the wheel function based on the provided index
+        function spinWheel(index) {
+            const segmentCount = parseInt(segmentInput.value);
+            const segmentAngle = 360 / segmentCount; // Calculate angle per segment
+            const randomFullRotations = Math.floor(Math.random() * 5) + 5; // Random full rotations (5 to 9)
+            const targetAngle = index * segmentAngle; // Calculate the angle for the target index
+
+            // Adjust the wheel so that the arrow points at the correct segment
+            const offsetAngle = 360 - targetAngle;
+
+            // Total rotation: Full rotations + Offset to align segment with arrow
+            const totalAngle = randomFullRotations * 360 + offsetAngle;
+
+            // Spin the wheel
+            wheel.style.transition = "transform 3s ease-out";
+            wheel.style.transform = `rotate(${totalAngle}deg)`;
+
+            // Highlight the winning segment
+            setTimeout(() => {
+                highlightWinningSegment(index); // Highlight winning segment
+            }, 3000); // After spin finishes
+        }
+        // Highlight winning segment
+        function highlightWinningSegment(index) {
+            const segments = document.querySelectorAll('.wheel-segment');
+            segments.forEach((segment, i) => {
+                segment.classList.remove('winning-segment'); // Remove highlight from all segments
+                if (i === index) {
+                    segment.classList.add('winning-segment'); // Highlight winning segment
+                }
+            });
+        }
+
+        // Handle connection and errors
+        socket.on("connect", () => {
+            console.log("Connected to the server");
+        });
+
+        socket.on("WalletNotFound", (message) => {
+            alert(message.message);
+        });
+
+        socket.on("Insufficientfund", (message) => {
+            alert(message.message);
+        });
+
+        socket.on("disconnect", () => {
+            console.log("Disconnected from server");
+        });
+    </script>
+
+</body>
+
+</html>

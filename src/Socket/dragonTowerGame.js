@@ -25,7 +25,7 @@ export const dragonTowerSocketHandler = (io) => {
             try {
                 if (!data.gameId && !data.userId) {
                     throw new Error('Enter userId and gameId');
-                }
+                } 
                 const activeBet = await Bet.findOne({
                     where: {
                         userId: data.userId,
@@ -60,8 +60,11 @@ export const dragonTowerSocketHandler = (io) => {
             currentMultiplier = 0;
             selectedTileObj = {};
             stage = '';
+            multiplier = 0;
 
             const { userId, gameId, betAmount, difficulty, betType } = data;
+            console.log(data);
+
             try {
                 const wallet = await Wallet.findOne({ where: { userId } });
                 if (!wallet) {
@@ -69,21 +72,24 @@ export const dragonTowerSocketHandler = (io) => {
                 }
 
                 if (!wallet) {
-                    io.to(user.id).emit('WalletNotFound', { message: 'Wallet not found', status: true });
+                    io.to(userId).emit('WalletNotFound', { message: 'Wallet not found', status: true });
                     return;
                 }
-                if (wallet.currentAmount <= betAmount) {
+                if (parseFloat(wallet.currentAmount) <= parseFloat(betAmount)) {
                     console.log('inif', wallet.currentAmount, betAmount);
-                    io.to(user.id).emit('Insufficientfund', { message: 'Insufficient funds', status: true });
+                    io.to(userId).emit('Insufficientfund', { message: 'Insufficient funds', status: true });
                     return;
                 }
-
+                console.log("before multiplier called =======")
                 multiplier = await calculateAdaptiveMultiplier(userId, difficulty, gameId);
+                console.log("multiplier", multiplier);
 
                 // Create a new bet record
                 const bet = await Bet.create({ gameId, userId, difficulty, betAmount, betType, multiplier });
                 betId = bet.id;
                 stage = difficulty
+
+                console.log("difficulty ==========", stage)
 
                 await DragonTowerLocation.create({
                     gameId,
@@ -250,7 +256,7 @@ export const dragonTowerSocketHandler = (io) => {
             stage = bet.difficulty;
             // Fetch mine locations associated with the bet
             const data = await DragonTowerLocation.findOne({ where: { gameId, userId, betId } });
-            console.log("data ===", data)
+
             const selectedTiles = data.selectedTile
             const restoreData = JSON.parse(selectedTiles)
             const currentStep = Object.keys(restoreData).length
@@ -281,10 +287,12 @@ export const dragonTowerSocketHandler = (io) => {
             // Calculate total win and loss amounts
             const { totalWins, totalLosses } = lastBets.reduce(
                 (acc, bet) => {
-                    if (bet.status === 'win') {
-                        acc.totalWins += bet.winAmount;
+                    if (bet.winAmount > 0) {
+                        acc.totalWins += parseFloat(bet.winAmount);
+                        console.log("if");
                     } else {
-                        acc.totalLosses += bet.betAmount;
+                        acc.totalLosses += parseFloat(bet.betAmount);
+                        console.log("else", acc.totalLosses, bet.betAmount);
                     }
                     return acc;
                 },
@@ -293,11 +301,14 @@ export const dragonTowerSocketHandler = (io) => {
 
             // Determine whether the user is in profit or loss
             const inProfit = totalWins > totalLosses;
+            console.log("ouhiksdhfkicvbhjkhSBDKfjcbzkCDbvM<JBSZKmvcbzkjs", rawConfigs[difficulty].length);
 
+            const midIndex = Math.floor(rawConfigs[difficulty].length / 2);
             // Select the appropriate multiplier index
-            let newStep = inProfit ? Math.max(0, step - 1) : Math.min(step + 1, rawConfigs[difficulty].length - 1);
+            let newStep = inProfit ? Math.floor(Math.random() * midIndex) : Math.floor(Math.random() * (rawConfigs[difficulty].length - midIndex)) + midIndex;
 
             console.log(`Adaptive step selected: ${newStep} for difficulty: ${difficulty}`);
+            console.log("rawConfigs[difficulty][newStep];", rawConfigs[difficulty][newStep]);
 
             // Return the adaptive multiplier
             return rawConfigs[difficulty][newStep];
@@ -305,6 +316,8 @@ export const dragonTowerSocketHandler = (io) => {
 
 
         async function selectTile(gameId, userId, tileStep, tileIndex, betId, step) {
+            console.log("stage", stage);
+
             const arr = new Array(...arrayConfig[stage]);
             console.log("entrance array ===", arr)
             const bet = await Bet.findOne({

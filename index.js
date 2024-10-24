@@ -38,6 +38,7 @@ const {
     wheelServer,
     limboServer,
     dragonTowerServer,
+    testingServer,
     chatIo,
     crashIo,
     plinkoIo,
@@ -78,7 +79,8 @@ startServers({
     mineServer,
     wheelServer,
     limboServer,
-    dragonTowerServer
+    dragonTowerServer,
+    testingServer
 });
 
 const port = process.env.PORT
